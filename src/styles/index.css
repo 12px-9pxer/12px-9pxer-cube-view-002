@@ -1,0 +1,145 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css");
+@import "tailwindcss";
+
+:root {
+  --color-bg-warm: #f9f9f7;
+  --color-bg-cool: #f7f6f6;
+  --color-black-soft: #2c2c2d;
+  --color-option: #353535;
+  --color-glass-gray: #c4c4c4;
+  --color-white: #ffffff;
+  --color-muted-text: #e4e4e4;
+  --color-blue: #1447e6;
+  --color-avatar-blue: #c8e1f5;
+  --color-avatar-peach: #fae9e5;
+  --color-avatar-text: #b1432c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: #0f0f10;
+  font-family:
+    "Pretendard",
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.prototype-root {
+  position: relative;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+  background: #0f0f10;
+}
+
+.prototype-stage {
+  position: absolute;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+  background: #0f0f10;
+}
+
+.prototype-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.prototype-background-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.prototype-background-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.prototype-background-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.prototype-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100vw;
+  height: 100dvh;
+  overflow: visible;
+}
+
+.screen-fill {
+  position: absolute;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  overflow: visible;
+}
+
+.glass-panel {
+  border: 2px solid rgb(255 255 255 / 5%);
+  background: rgb(196 196 196 / 20%);
+  backdrop-filter: blur(50px);
+}
+
+.glass-panel-strong {
+  border: 1px solid rgb(255 255 255 / 5%);
+  background: rgb(196 196 196 / 30%);
+  backdrop-filter: blur(70px);
+}
+
+.comment-card-glass {
+  backdrop-filter: blur(var(--comment-card-glass-blur, 80px));
+  -webkit-backdrop-filter: blur(var(--comment-card-glass-blur, 80px));
+}
+
+.text-crisp {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+@media (max-width: 900px) {
+  .page3-comment-input {
+    left: 16px !important;
+    top: calc(var(--safe-bottom) - 76px - 16px) !important;
+  }
+
+  .page3-reaction-bar {
+    top: calc(var(--safe-bottom) - 76px - 108px) !important;
+  }
+
+  .page3-poll-card {
+    top: calc(var(--safe-top) + 112px) !important;
+  }
+}

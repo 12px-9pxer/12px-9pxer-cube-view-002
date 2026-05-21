@@ -1,0 +1,38 @@
+{
+  "name": "cube-view-user-story-prototype",
+  "version": "0.1.0",
+  "description": "Figma 기반 User Story Cube View 웹 프로토타입",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "keywords": [
+    "figma",
+    "prototype",
+    "react",
+    "tailwind",
+    "r3f"
+  ],
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@react-three/fiber": "^9.6.1",
+    "gsap": "^3.15.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "playwright-core": "^1.60.0",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.13"
+  }
+}
