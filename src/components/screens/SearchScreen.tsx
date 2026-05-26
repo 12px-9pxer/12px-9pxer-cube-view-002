@@ -4,9 +4,14 @@ import { CubeScenePlaceholder } from "../three/CubeScenePlaceholder";
 import { AnimatedButton } from "../ui/AnimatedButton";
 import { ArrowGlyph } from "../ui/ArrowGlyph";
 import { GlassIconButton } from "../ui/GlassIconButton";
+import { SingleCubeStoryCard } from "../ui/SingleCubeStoryCard";
 import { UserStoryLogo } from "../ui/UserStoryLogo";
 
-export function SearchScreen() {
+type SearchScreenProps = {
+  onOpenStoryDetail: () => void;
+};
+
+export function SearchScreen({ onOpenStoryDetail }: SearchScreenProps) {
   const [query, setQuery] = useState("");
   const [highlightRequestId, setHighlightRequestId] = useState(0);
   const [exitOrbitViewRequestId, setExitOrbitViewRequestId] = useState(0);
@@ -33,21 +38,26 @@ export function SearchScreen() {
       />
 
       {isOrbitView ? (
-        <AnimatedButton
-          type="button"
-          onClick={() => setExitOrbitViewRequestId((requestId) => requestId + 1)}
-          className="absolute left-[calc(var(--safe-left)+32px)] top-[calc(var(--safe-top)+32px)] z-20 flex h-[54px] items-center justify-center gap-[8px] rounded-full bg-[#2c2c2d] px-[22px] text-[20px] font-medium leading-[1.5] text-white backdrop-blur-[18.29px]"
-          data-name="button/back-to-cube-map"
-          aria-label="Back to cube map"
-          title="Back to cube map"
-        >
-          <ArrowGlyph className="rotate-180" />
-          <span>Back</span>
-        </AnimatedButton>
+        <>
+          <AnimatedButton
+            type="button"
+            onClick={() => setExitOrbitViewRequestId((requestId) => requestId + 1)}
+            className="absolute left-[calc(var(--safe-left)+32px)] top-[calc(var(--safe-top)+32px)] z-20 flex h-[54px] items-center justify-center gap-[8px] rounded-full bg-[#2c2c2d] px-[22px] text-[20px] font-medium leading-[1.5] text-white backdrop-blur-[18.29px]"
+            data-name="button/back-to-cube-map"
+            aria-label="Back to cube map"
+            title="Back to cube map"
+          >
+            <ArrowGlyph className="rotate-180" />
+            <span>Back</span>
+          </AnimatedButton>
+
+          <SingleCubeStoryCard onOpenStoryDetail={onOpenStoryDetail} />
+        </>
       ) : (
         <>
           <UserStoryLogo
             className="absolute left-[calc(var(--safe-left)+86px)] top-[calc(var(--safe-top)+50px)] z-10 max-[900px]:hidden"
+            shadowClassName="drop-shadow-[0_1.33px_6.12px_rgba(0,0,0,0.23)]"
             nodeId="15:151"
           />
 

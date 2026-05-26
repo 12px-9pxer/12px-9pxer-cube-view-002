@@ -337,7 +337,7 @@ export default function App() {
         ) : null}
 
         {screen === "search" ? (
-          <SearchScreen />
+          <SearchScreen onOpenStoryDetail={() => goToScreen("detail")} />
         ) : null}
 
         {screen === "detail" ? (

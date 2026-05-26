@@ -178,4 +178,18 @@ button {
   .page3-poll-card {
     top: calc(var(--safe-top) + 112px) !important;
   }
+
+  .single-cube-story-card {
+    left: 16px !important;
+    top: calc(var(--safe-top) + 96px) !important;
+    width: calc(var(--viewport-width) - 32px) !important;
+    height: min(600px, calc(var(--safe-bottom) - var(--safe-top) - 112px)) !important;
+    overflow-y: auto !important;
+    border-radius: 30px !important;
+    padding: 18px !important;
+  }
+
+  .single-cube-story-card figure {
+    height: 240px !important;
+  }
 }
