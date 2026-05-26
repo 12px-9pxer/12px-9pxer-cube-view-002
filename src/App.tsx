@@ -24,7 +24,7 @@ import {
 const screenBackgrounds: Record<
   ScreenId,
   {
-    src: string;
+    src: string | null;
     imageClassName?: string;
     overlayClassName?: string;
   }
@@ -35,8 +35,7 @@ const screenBackgrounds: Record<
     overlayClassName: "bg-[rgba(212,212,212,0.2)]",
   },
   search: {
-    src: prototypeAssets.searchBg,
-    imageClassName: "mix-blend-darken",
+    src: null,
   },
   detail: {
     src: prototypeAssets.detailBg,
@@ -338,7 +337,7 @@ export default function App() {
         ) : null}
 
         {screen === "search" ? (
-          <SearchScreen onOpenStoryDetail={() => goToScreen("detail")} />
+          <SearchScreen />
         ) : null}
 
         {screen === "detail" ? (

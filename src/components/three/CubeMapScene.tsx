@@ -1,0 +1,1576 @@
+// @ts-nocheck
+import { useEffect, useRef } from "react";
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import {
+  buildCubeMapOverview,
+  CUBE_MAP_STEPS,
+  CUBE_MAP_UNIT,
+  type CubeMapOverviewNode,
+} from "./cubeMapData";
+import { cubeSceneTheme } from "./cubeSceneTheme";
+import { createCookTorranceMaterial } from "./createCookTorranceMaterial";
+
+const SIZE = (CUBE_MAP_STEPS - 1) * CUBE_MAP_UNIT;
+const GRAPH_CENTER = new THREE.Vector3(SIZE / 2, SIZE / 2, SIZE / 2);
+const GRID_MIN = -CUBE_MAP_UNIT / 2;
+const GRID_MAX = SIZE + CUBE_MAP_UNIT / 2;
+const GRID_VISIBILITY_VECTOR = new THREE.Vector3();
+const SEARCH_DIMMED_OPACITY = 0.1;
+const EMPTY_SPACE_CLICK_THRESHOLD = 6;
+
+type VectorTuple = readonly [number, number, number];
+
+type TargetCandidate = {
+  mesh: CubeMesh;
+  position: THREE.Vector3;
+  scale: number;
+};
+
+type TargetBox = {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  minZ: number;
+  maxZ: number;
+};
+
+type SearchHighlightZoomState = {
+  startTime: number;
+  fromPosition: THREE.Vector3;
+  fromTarget: THREE.Vector3;
+  toPosition: THREE.Vector3;
+  toTarget: THREE.Vector3;
+};
+
+type CubeMeshUserData = CubeMapOverviewNode & {
+  basePosition: THREE.Vector3;
+  targetPosition: THREE.Vector3;
+  targetScale: number;
+  entryProgress: number;
+  enterStart: number;
+  enterDuration: number;
+  entryComplete: boolean;
+  baseOpacity: number;
+  targetOpacity: number;
+  targetOpacityMapMix: number;
+  maskOccluder: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+};
+
+type CubeMesh = THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial> & {
+  userData: CubeMeshUserData;
+};
+
+type GridPlane = THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial> & {
+  userData: {
+    visibilityNormal?: THREE.Vector3;
+    visibilityPoint?: THREE.Vector3;
+  };
+};
+
+type GridPlaneOptions = {
+  plane: "xy" | "xz" | "yz";
+  fixed: number;
+  min: number;
+  max: number;
+  step: number;
+  divisions: number;
+  color: THREE.ColorRepresentation;
+  opacity: number;
+  visibilityNormal?: VectorTuple;
+  visibilityPoint?: VectorTuple;
+  skipPrimaryLines?: number[];
+  skipSecondaryLines?: number[];
+};
+
+function outCirc(t: number) {
+  return Math.sqrt(1 - Math.pow(Math.min(t, 1) - 1, 2));
+}
+
+function easeOutCubic(t: number) {
+  return 1 - Math.pow(1 - THREE.MathUtils.clamp(t, 0, 1), 3);
+}
+
+function lerpValue(current: number, target: number, amount: number) {
+  return current + (target - current) * amount;
+}
+
+function getCubeHalfExtent(scale: number, padding = 0) {
+  return (CUBE_MAP_UNIT * scale) / 2 + padding;
+}
+
+function clampTargetToBounds(target: THREE.Vector3, scale: number) {
+  const halfExtent = getCubeHalfExtent(scale, cubeSceneTheme.hover.boundaryPadding);
+  target.x = THREE.MathUtils.clamp(target.x, GRID_MIN + halfExtent, GRID_MAX - halfExtent);
+  target.y = THREE.MathUtils.clamp(target.y, GRID_MIN + halfExtent, GRID_MAX - halfExtent);
+  target.z = THREE.MathUtils.clamp(target.z, GRID_MIN + halfExtent, GRID_MAX - halfExtent);
+
+  return target;
+}
+
+function getTargetBox(target: THREE.Vector3, scale: number): TargetBox {
+  const halfExtent = getCubeHalfExtent(scale, cubeSceneTheme.hover.collisionPadding);
+
+  return {
+    minX: target.x - halfExtent,
+    maxX: target.x + halfExtent,
+    minY: target.y - halfExtent,
+    maxY: target.y + halfExtent,
+    minZ: target.z - halfExtent,
+    maxZ: target.z + halfExtent,
+  };
+}
+
+function boxesOverlap(a: TargetBox, b: TargetBox) {
+  return (
+    a.minX < b.maxX &&
+    a.maxX > b.minX &&
+    a.minY < b.maxY &&
+    a.maxY > b.minY &&
+    a.minZ < b.maxZ &&
+    a.maxZ > b.minZ
+  );
+}
+
+function hasTargetCollision(candidates: TargetCandidate[]) {
+  for (let i = 0; i < candidates.length; i += 1) {
+    const boxA = getTargetBox(candidates[i].position, candidates[i].scale);
+
+    for (let j = i + 1; j < candidates.length; j += 1) {
+      const boxB = getTargetBox(candidates[j].position, candidates[j].scale);
+
+      if (boxesOverlap(boxA, boxB)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function getCubeBaseColor(node: CubeMapOverviewNode, index: number) {
+  const { baseColorOverride, palette, paletteMode } = cubeSceneTheme.cube.shader;
+
+  if (baseColorOverride) {
+    return baseColorOverride;
+  }
+
+  if (paletteMode !== "spatial" || !Array.isArray(palette) || palette.length === 0) {
+    return "#ffffff";
+  }
+
+  const hash =
+    Math.imul(node.x + 1, 73856093) ^
+    Math.imul(node.y + 1, 19349663) ^
+    Math.imul(node.z + 1, 83492791) ^
+    Math.imul(index + 1, 265443576);
+
+  return palette[Math.abs(hash) % palette.length];
+}
+
+function disposeMaterial(material: THREE.Material | THREE.Material[]) {
+  if (Array.isArray(material)) {
+    material.forEach((entry) => entry.dispose());
+    return;
+  }
+
+  material.dispose();
+}
+
+function disposeObject(object: THREE.Object3D) {
+  object.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    mesh.geometry?.dispose?.();
+
+    if (mesh.material) {
+      disposeMaterial(mesh.material);
+    }
+  });
+}
+
+function findFirstMesh(object: THREE.Object3D) {
+  let result: THREE.Mesh | null = null;
+
+  object.traverse((child) => {
+    if (!result && (child as THREE.Mesh).isMesh) {
+      result = child as THREE.Mesh;
+    }
+  });
+
+  return result;
+}
+
+function normalizeCubeGeometry(sourceGeometry: THREE.BufferGeometry) {
+  const geometry = sourceGeometry;
+  geometry.computeBoundingBox();
+
+  const bounds = geometry.boundingBox;
+
+  if (!bounds) {
+    return geometry;
+  }
+
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  bounds.getSize(size);
+  bounds.getCenter(center);
+
+  geometry.translate(-center.x, -center.y, -center.z);
+
+  const maxDimension = Math.max(size.x, size.y, size.z);
+
+  if (Number.isFinite(maxDimension) && maxDimension > 0) {
+    const scale = CUBE_MAP_UNIT / maxDimension;
+
+    if (Math.abs(scale - 1) > 0.0001) {
+      geometry.scale(scale, scale, scale);
+    }
+  }
+
+  if (!geometry.getAttribute("normal")) {
+    geometry.computeVertexNormals();
+  }
+
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+
+  return geometry;
+}
+
+async function loadCubeModelGeometry(src: string) {
+  const gltf = await new GLTFLoader().loadAsync(src);
+  gltf.scene.updateMatrixWorld(true);
+
+  const sourceMesh = findFirstMesh(gltf.scene);
+
+  if (!sourceMesh?.geometry) {
+    throw new Error(`Cube model does not contain a mesh: ${src}`);
+  }
+
+  if (!sourceMesh.geometry.getAttribute("uv")) {
+    throw new Error(`Cube model is missing UV Channel 1 data: ${src}`);
+  }
+
+  sourceMesh.updateWorldMatrix(true, false);
+  const geometry = sourceMesh.geometry.clone();
+  geometry.applyMatrix4(sourceMesh.matrixWorld);
+  disposeObject(gltf.scene);
+
+  return normalizeCubeGeometry(geometry);
+}
+
+function configureCubeMaskTexture(texture: THREE.Texture) {
+  texture.flipY = false;
+  texture.colorSpace = THREE.NoColorSpace;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = true;
+  texture.needsUpdate = true;
+
+  return texture;
+}
+
+async function loadCubeMaskTexture(src: string, loader: THREE.TextureLoader) {
+  const texture = await loader.loadAsync(src);
+
+  return configureCubeMaskTexture(texture);
+}
+
+function configureStoryThumbnailTexture(texture: THREE.Texture) {
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = true;
+  texture.needsUpdate = true;
+
+  return texture;
+}
+
+async function loadStoryThumbnailTextures(srcs: readonly string[], loader: THREE.TextureLoader) {
+  const textures = await Promise.all(srcs.map((src) => loader.loadAsync(src)));
+
+  return textures.map(configureStoryThumbnailTexture);
+}
+
+function shuffleItems<T>(items: readonly T[]) {
+  const shuffled = [...items];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+
+  return shuffled;
+}
+
+function getGridPoint(
+  plane: GridPlaneOptions["plane"],
+  primary: number,
+  secondary: number,
+  fixed: number,
+): [number, number, number] {
+  if (plane === "xz") {
+    return [primary, fixed, secondary];
+  }
+
+  if (plane === "yz") {
+    return [fixed, primary, secondary];
+  }
+
+  return [primary, secondary, fixed];
+}
+
+function createGridPlane({
+  plane,
+  fixed,
+  min,
+  max,
+  step,
+  divisions,
+  color,
+  opacity,
+  visibilityNormal,
+  visibilityPoint,
+  skipPrimaryLines = [],
+  skipSecondaryLines = [],
+}: GridPlaneOptions) {
+  const positions: number[] = [];
+  const skippedPrimary = new Set(skipPrimaryLines);
+  const skippedSecondary = new Set(skipSecondaryLines);
+
+  const addSegment = (from: [number, number, number], to: [number, number, number]) => {
+    positions.push(...from, ...to);
+  };
+
+  for (let i = 0; i <= divisions; i += 1) {
+    const coord = min + i * step;
+
+    if (!skippedSecondary.has(i)) {
+      addSegment(
+        getGridPoint(plane, min, coord, fixed),
+        getGridPoint(plane, max, coord, fixed),
+      );
+    }
+
+    if (!skippedPrimary.has(i)) {
+      addSegment(
+        getGridPoint(plane, coord, min, fixed),
+        getGridPoint(plane, coord, max, fixed),
+      );
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  const material = new THREE.LineBasicMaterial({
+    color,
+    transparent: true,
+    opacity,
+  });
+
+  const gridPlane = new THREE.LineSegments(geometry, material) as GridPlane;
+
+  if (visibilityNormal && visibilityPoint) {
+    gridPlane.userData.visibilityNormal = new THREE.Vector3(...visibilityNormal).normalize();
+    gridPlane.userData.visibilityPoint = new THREE.Vector3(...visibilityPoint);
+  }
+
+  return gridPlane;
+}
+
+function updateGridPlaneVisibility(
+  gridPlanes: GridPlane[],
+  camera: THREE.Camera,
+  epsilon: number,
+) {
+  gridPlanes.forEach((gridPlane) => {
+    const { visibilityNormal, visibilityPoint } = gridPlane.userData;
+
+    if (!visibilityNormal || !visibilityPoint) {
+      gridPlane.visible = true;
+      return;
+    }
+
+    gridPlane.visible =
+      GRID_VISIBILITY_VECTOR.subVectors(camera.position, visibilityPoint).dot(visibilityNormal) >
+      epsilon;
+  });
+}
+
+function createMaskOutlineMaterial(maskTexture: THREE.Texture) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      maskTexture: { value: maskTexture },
+      resolution: { value: new THREE.Vector2(1, 1) },
+      time: { value: 0 },
+      opacity: { value: 0 },
+      outlineColor: { value: new THREE.Color(cubeSceneTheme.hoverGlow.outlineColor) },
+      glowColor: { value: new THREE.Color(cubeSceneTheme.hoverGlow.glowColor) },
+      outlineOpacity: { value: cubeSceneTheme.hoverGlow.outlineOpacity },
+      glowOpacity: { value: cubeSceneTheme.hoverGlow.glowOpacity },
+      outlineThickness: { value: cubeSceneTheme.hoverGlow.outlineThickness },
+      glowRadius: { value: cubeSceneTheme.hoverGlow.glowRadius },
+      noiseStrength: { value: cubeSceneTheme.hoverGlow.noiseStrength },
+      flowSpeed: { value: cubeSceneTheme.hoverGlow.flowSpeed },
+      pulseSpeed: { value: cubeSceneTheme.hoverGlow.pulseSpeed },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position.xy, 0.0, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D maskTexture;
+      uniform vec2 resolution;
+      uniform float time;
+      uniform float opacity;
+      uniform vec3 outlineColor;
+      uniform vec3 glowColor;
+      uniform float outlineOpacity;
+      uniform float glowOpacity;
+      uniform float outlineThickness;
+      uniform float glowRadius;
+      uniform float noiseStrength;
+      uniform float flowSpeed;
+      uniform float pulseSpeed;
+
+      varying vec2 vUv;
+
+      float readMask(vec2 uv) {
+        return texture2D(maskTexture, uv).r;
+      }
+
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+      }
+
+      float valueNoise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+
+        float n00 = hash(i + vec2(0.0, 0.0));
+        float n10 = hash(i + vec2(1.0, 0.0));
+        float n01 = hash(i + vec2(0.0, 1.0));
+        float n11 = hash(i + vec2(1.0, 1.0));
+
+        return mix(mix(n00, n10, f.x), mix(n01, n11, f.x), f.y);
+      }
+
+      void main() {
+        vec2 texel = 1.0 / resolution;
+        float center = readMask(vUv);
+        float thickness = max(outlineThickness, 1.0);
+
+        float edge = 0.0;
+        edge = max(edge, abs(readMask(vUv + texel * vec2(thickness, 0.0)) - center));
+        edge = max(edge, abs(readMask(vUv + texel * vec2(-thickness, 0.0)) - center));
+        edge = max(edge, abs(readMask(vUv + texel * vec2(0.0, thickness)) - center));
+        edge = max(edge, abs(readMask(vUv + texel * vec2(0.0, -thickness)) - center));
+        edge = max(edge, abs(readMask(vUv + texel * vec2(thickness, thickness)) - center));
+        edge = max(edge, abs(readMask(vUv + texel * vec2(-thickness, thickness)) - center));
+        edge = max(edge, abs(readMask(vUv + texel * vec2(thickness, -thickness)) - center));
+        edge = max(edge, abs(readMask(vUv + texel * vec2(-thickness, -thickness)) - center));
+        edge = smoothstep(0.08, 0.42, edge);
+
+        float glow = 0.0;
+        float weight = 0.0;
+        for (int i = 1; i <= 8; i += 1) {
+          float radius = glowRadius * (float(i) / 8.0);
+          float falloff = 1.0 - float(i - 1) / 8.0;
+          vec2 offset = texel * radius;
+
+          glow += readMask(vUv + vec2(offset.x, 0.0)) * falloff;
+          glow += readMask(vUv - vec2(offset.x, 0.0)) * falloff;
+          glow += readMask(vUv + vec2(0.0, offset.y)) * falloff;
+          glow += readMask(vUv - vec2(0.0, offset.y)) * falloff;
+          glow += readMask(vUv + offset * 0.7071) * falloff;
+          glow += readMask(vUv - offset * 0.7071) * falloff;
+          glow += readMask(vUv + vec2(offset.x, -offset.y) * 0.7071) * falloff;
+          glow += readMask(vUv + vec2(-offset.x, offset.y) * 0.7071) * falloff;
+          weight += 8.0 * falloff;
+        }
+
+        glow = clamp(glow / max(weight, 0.0001), 0.0, 1.0);
+        glow *= 1.0 - smoothstep(0.1, 0.85, center);
+        glow = smoothstep(0.02, 0.38, glow);
+
+        float flowTime = time * flowSpeed;
+        float noise = valueNoise(vUv * resolution * 0.018 + vec2(flowTime * 18.0, flowTime * 9.0));
+        float wave = sin((vUv.y * resolution.y * 0.035) + flowTime * 6.0 + noise * 3.14159);
+        float pulse = 0.82 + 0.18 * sin(time * pulseSpeed + noise * 4.0);
+        float shimmer = mix(noise, wave * 0.5 + 0.5, 0.42);
+        float noiseMask = mix(1.0 - noiseStrength, 1.0 + noiseStrength, shimmer) * pulse;
+
+        float outlineAlpha = edge * outlineOpacity;
+        float glowAlpha = glow * glowOpacity * noiseMask;
+        float alpha = clamp(outlineAlpha + glowAlpha, 0.0, 1.0) * opacity;
+        vec3 color = outlineColor * outlineAlpha + glowColor * glowAlpha;
+        color /= max(outlineAlpha + glowAlpha, 0.0001);
+
+        gl_FragColor = vec4(color, alpha);
+      }
+    `,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.NormalBlending,
+  });
+}
+
+type CubeMapSceneProps = {
+  highlightRequestId?: number;
+  exitOrbitViewRequestId?: number;
+  onOrbitViewChange?: (isOrbitView: boolean) => void;
+};
+
+type CubeViewMode = "map" | "orbit";
+
+export default function CubeMapScene({
+  highlightRequestId = 0,
+  exitOrbitViewRequestId = 0,
+  onOrbitViewChange,
+}: CubeMapSceneProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const searchHighlightHandlerRef = useRef<(() => void) | null>(null);
+  const exitOrbitViewHandlerRef = useRef<(() => void) | null>(null);
+  const orbitViewChangeRef = useRef(onOrbitViewChange);
+  const pendingHighlightRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    orbitViewChangeRef.current = onOrbitViewChange;
+  }, [onOrbitViewChange]);
+
+  useEffect(() => {
+    if (highlightRequestId <= 0) {
+      return;
+    }
+
+    if (searchHighlightHandlerRef.current) {
+      searchHighlightHandlerRef.current();
+      return;
+    }
+
+    pendingHighlightRequestIdRef.current = highlightRequestId;
+  }, [highlightRequestId]);
+
+  useEffect(() => {
+    if (exitOrbitViewRequestId <= 0) {
+      return;
+    }
+
+    exitOrbitViewHandlerRef.current?.();
+  }, [exitOrbitViewRequestId]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+
+    if (!container) {
+      return undefined;
+    }
+
+    THREE.ColorManagement.enabled = true;
+
+    const overview = buildCubeMapOverview();
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(cubeSceneTheme.background);
+    scene.fog = new THREE.FogExp2(cubeSceneTheme.background, cubeSceneTheme.fog.density);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance",
+      preserveDrawingBuffer: true,
+    });
+    renderer.setClearColor(cubeSceneTheme.background, 1);
+    renderer.autoClear = false;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = cubeSceneTheme.rendering.toneMappingExposure;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.domElement.setAttribute("data-cube-map-canvas", "true");
+    container.appendChild(renderer.domElement);
+
+    const maskRenderTarget = new THREE.WebGLRenderTarget(1, 1, {
+      format: THREE.RGBAFormat,
+      type: THREE.UnsignedByteType,
+      depthBuffer: true,
+      stencilBuffer: false,
+    });
+    maskRenderTarget.texture.minFilter = THREE.NearestFilter;
+    maskRenderTarget.texture.magFilter = THREE.NearestFilter;
+    maskRenderTarget.texture.generateMipmaps = false;
+
+    if (renderer.capabilities.isWebGL2) {
+      maskRenderTarget.samples = 4;
+    }
+
+    const maskScene = new THREE.Scene();
+    const maskMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      depthTest: true,
+      depthWrite: true,
+    });
+    const maskOccluderMaterial = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      colorWrite: false,
+      depthTest: true,
+      depthWrite: true,
+    });
+    const overlayScene = new THREE.Scene();
+    const overlayCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const overlayGeometry = new THREE.PlaneGeometry(2, 2);
+    const outlineMaterial = createMaskOutlineMaterial(maskRenderTarget.texture);
+    const overlayQuad = new THREE.Mesh(overlayGeometry, outlineMaterial);
+    overlayQuad.frustumCulled = false;
+    overlayScene.add(overlayQuad);
+
+    const camera = new THREE.PerspectiveCamera(
+      cubeSceneTheme.camera.fov,
+      1,
+      cubeSceneTheme.camera.near,
+      cubeSceneTheme.camera.far,
+    );
+    const cameraOffset = new THREE.Vector3(...cubeSceneTheme.camera.offset).sub(GRAPH_CENTER);
+    camera.position
+      .copy(GRAPH_CENTER)
+      .add(cameraOffset.normalize().multiplyScalar(cubeSceneTheme.camera.distance));
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = cubeSceneTheme.controls.dampingFactor;
+    controls.enablePan = true;
+    controls.enableZoom = true;
+    controls.minDistance = cubeSceneTheme.camera.minDistance;
+    controls.maxDistance = cubeSceneTheme.camera.maxDistance;
+    controls.panSpeed = cubeSceneTheme.controls.panSpeed;
+    controls.rotateSpeed = cubeSceneTheme.controls.rotateSpeed;
+    controls.zoomSpeed = cubeSceneTheme.controls.zoomSpeed;
+    controls.target.copy(GRAPH_CENTER);
+    controls.update();
+
+    scene.add(
+      new THREE.AmbientLight(
+        cubeSceneTheme.lights.ambient.color,
+        cubeSceneTheme.lights.ambient.intensity,
+      ),
+    );
+    cubeSceneTheme.lights.directional.forEach(({ color, position, intensity }) => {
+      const light = new THREE.DirectionalLight(color, intensity);
+      light.position.set(...position);
+      scene.add(light);
+    });
+
+    const gridPlaneOptions = {
+      min: GRID_MIN,
+      max: GRID_MAX,
+      step: CUBE_MAP_UNIT,
+      divisions: CUBE_MAP_STEPS,
+      color: cubeSceneTheme.grid.color,
+      opacity: cubeSceneTheme.grid.opacity,
+    };
+    const gridPlanes = [
+      createGridPlane({
+        ...gridPlaneOptions,
+        plane: "xz",
+        fixed: GRID_MIN,
+        visibilityNormal: [0, 1, 0],
+        visibilityPoint: [GRAPH_CENTER.x, GRID_MIN, GRAPH_CENTER.z],
+      }),
+      createGridPlane({
+        ...gridPlaneOptions,
+        plane: "yz",
+        fixed: GRID_MIN,
+        visibilityNormal: [1, 0, 0],
+        visibilityPoint: [GRID_MIN, GRAPH_CENTER.y, GRAPH_CENTER.z],
+        skipPrimaryLines: [0],
+      }),
+      createGridPlane({
+        ...gridPlaneOptions,
+        plane: "xy",
+        fixed: GRID_MIN,
+        visibilityNormal: [0, 0, 1],
+        visibilityPoint: [GRAPH_CENTER.x, GRAPH_CENTER.y, GRID_MIN],
+        skipPrimaryLines: [0],
+        skipSecondaryLines: [0],
+      }),
+    ];
+    gridPlanes.forEach((gridPlane) => scene.add(gridPlane));
+
+    const nodesGroup = new THREE.Group();
+    const cubeMeshes: CubeMesh[] = [];
+    scene.add(nodesGroup);
+
+    let nodeGeometry: THREE.BufferGeometry | null = null;
+    let maskMesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | null = null;
+    let opacityMaskTexture: THREE.Texture | null = null;
+    let orbitOpacityMaskTexture: THREE.Texture | null = null;
+    let emissiveMaskTexture: THREE.Texture | null = null;
+    let storyThumbnailTextures: THREE.Texture[] = [];
+    let storyThumbnailCube: THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial[]> | null = null;
+    let cubeAssetsReady = false;
+    let animationFrame = 0;
+    let disposed = false;
+    const maskOccludersGroup = new THREE.Group();
+    maskOccludersGroup.visible = false;
+    maskScene.add(maskOccludersGroup);
+
+    const primaryLight = cubeSceneTheme.lights.directional[0];
+    const shaderTheme = cubeSceneTheme.cube.shader;
+    const ambientColor = new THREE.Color(cubeSceneTheme.lights.ambient.color).multiplyScalar(
+      cubeSceneTheme.lights.ambient.intensity,
+    );
+
+    const createCubeMeshes = (
+      geometry: THREE.BufferGeometry,
+      opacityMask: THREE.Texture,
+      orbitOpacityMask: THREE.Texture,
+      emissiveMask: THREE.Texture,
+    ) => {
+      nodeGeometry = geometry;
+      opacityMaskTexture = opacityMask;
+      orbitOpacityMaskTexture = orbitOpacityMask;
+      emissiveMaskTexture = emissiveMask;
+
+      maskMesh = new THREE.Mesh(nodeGeometry, maskMaterial);
+      maskMesh.matrixAutoUpdate = false;
+      maskMesh.visible = false;
+      maskMesh.frustumCulled = false;
+      maskScene.add(maskMesh);
+
+      const now = performance.now();
+
+      overview.nodes.forEach((node, index) => {
+        const basePosition = new THREE.Vector3(
+          node.x * CUBE_MAP_UNIT,
+          node.y * CUBE_MAP_UNIT,
+          node.z * CUBE_MAP_UNIT,
+        );
+        const cubeBaseColor = getCubeBaseColor(node, index);
+        const material = createCookTorranceMaterial({
+          baseColor: cubeBaseColor,
+          roughness: shaderTheme.roughness,
+          metallic: shaderTheme.metallic,
+          lightDirection: primaryLight.position,
+          lightColor: primaryLight.color,
+          lightIntensity: primaryLight.intensity,
+          ambientColor,
+          subsurfaceColor: shaderTheme.subsurfaceColor,
+          subsurfaceStrength: shaderTheme.subsurfaceStrength,
+          wrap: shaderTheme.wrap,
+          rimStrength: shaderTheme.rimStrength,
+          rimPower: shaderTheme.rimPower,
+          transmissionStrength: shaderTheme.transmissionStrength,
+          shadowStrength: shaderTheme.shadowStrength,
+          shadowSoftness: shaderTheme.shadowSoftness,
+          shadowLift: shaderTheme.shadowLift,
+          baseSaturation: shaderTheme.baseSaturation,
+          edgeSaturation: shaderTheme.edgeSaturation,
+          centerWhiteness: shaderTheme.centerWhiteness,
+          faceEdgePower: shaderTheme.faceEdgePower,
+          cubeHalfExtent: CUBE_MAP_UNIT / 2,
+          colorContrast: shaderTheme.colorContrast,
+          colorVibrance: shaderTheme.colorVibrance,
+          opacityMap: opacityMask,
+          orbitOpacityMap: orbitOpacityMask,
+          opacityMapMix: 0,
+          emissiveMap: emissiveMask,
+          emissiveColor: shaderTheme.emissiveColor,
+          emissiveStrength: shaderTheme.emissiveStrength,
+          opacity: cubeSceneTheme.cube.opacity,
+        });
+        const mesh = new THREE.Mesh(nodeGeometry, material) as CubeMesh;
+        mesh.position.copy(basePosition);
+        mesh.scale.setScalar(0);
+
+        const maskOccluder = new THREE.Mesh(nodeGeometry, maskOccluderMaterial);
+        maskOccluder.matrixAutoUpdate = false;
+        maskOccluder.visible = false;
+        maskOccluder.frustumCulled = false;
+        maskOccludersGroup.add(maskOccluder);
+
+        mesh.userData = {
+          ...node,
+          basePosition,
+          targetPosition: basePosition.clone(),
+          targetScale: 1,
+          entryProgress: 0,
+          enterStart:
+            now +
+            cubeSceneTheme.cube.enterDelay +
+            Math.min(index * cubeSceneTheme.cube.enterStagger, cubeSceneTheme.cube.enterMaxStagger),
+          enterDuration: cubeSceneTheme.cube.enterDuration,
+          entryComplete: false,
+          baseOpacity: cubeSceneTheme.cube.opacity,
+          targetOpacity: cubeSceneTheme.cube.opacity,
+          targetOpacityMapMix: 0,
+          maskOccluder,
+        };
+        nodesGroup.add(mesh);
+        cubeMeshes.push(mesh);
+      });
+
+      cubeAssetsReady = true;
+    };
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2(-9999, -9999);
+    const pointerDownPosition = new THREE.Vector2();
+    const spreadDirection = new THREE.Vector3();
+    const targetScaleVector = new THREE.Vector3();
+    const orbitCameraOffset = new THREE.Vector3();
+    const searchZoomTarget = new THREE.Vector3();
+    const searchZoomOffset = new THREE.Vector3();
+    let selectedMesh: CubeMesh | null = null;
+    let hovered: CubeMesh | null = null;
+    let outlineSource: CubeMesh | null = null;
+    let outlineOpacity = 0;
+    let isPointerInside = false;
+    let hasPointerDown = false;
+    let viewMode: CubeViewMode = "map";
+    let focusedMesh: CubeMesh | null = null;
+    let savedMapCameraState: {
+      position: THREE.Vector3;
+      target: THREE.Vector3;
+      minDistance: number;
+      maxDistance: number;
+      enablePan: boolean;
+    } | null = null;
+    let searchHighlightZoom: SearchHighlightZoomState | null = null;
+    let searchHighlightZoomBaseline: {
+      position: THREE.Vector3;
+      target: THREE.Vector3;
+    } | null = null;
+    container.dataset.cubeViewMode = "map";
+
+    const isSearchHighlightActive = () => Boolean(selectedMesh && viewMode === "map");
+
+    const notifyOrbitViewChange = () => {
+      orbitViewChangeRef.current?.(viewMode === "orbit");
+    };
+
+    const applyMapControls = () => {
+      controls.minDistance = cubeSceneTheme.camera.minDistance;
+      controls.maxDistance = cubeSceneTheme.camera.maxDistance;
+      controls.enablePan = true;
+    };
+
+    const applyOrbitControls = () => {
+      controls.minDistance = cubeSceneTheme.orbitView.minDistance;
+      controls.maxDistance = cubeSceneTheme.orbitView.maxDistance;
+      controls.enablePan = false;
+      controls.target.copy(GRAPH_CENTER);
+      orbitCameraOffset
+        .set(...cubeSceneTheme.orbitView.cameraOffset)
+        .normalize()
+        .multiplyScalar(cubeSceneTheme.orbitView.cameraDistance);
+      camera.position.copy(GRAPH_CENTER).add(orbitCameraOffset);
+      controls.update();
+    };
+
+    const cancelSearchHighlightZoom = (refreshBaseline = false) => {
+      searchHighlightZoom = null;
+
+      if (refreshBaseline && viewMode === "map") {
+        searchHighlightZoomBaseline = {
+          position: camera.position.clone(),
+          target: controls.target.clone(),
+        };
+      }
+    };
+
+    const resetSearchHighlightZoom = () => {
+      searchHighlightZoom = null;
+      searchHighlightZoomBaseline = null;
+    };
+
+    const startSearchHighlightZoom = (targetMesh: CubeMesh) => {
+      const baseline =
+        searchHighlightZoomBaseline ??
+        {
+          position: camera.position.clone(),
+          target: controls.target.clone(),
+        };
+      searchHighlightZoomBaseline = baseline;
+
+      searchZoomTarget
+        .copy(baseline.target)
+        .lerp(targetMesh.userData.basePosition, cubeSceneTheme.searchHighlightZoom.targetPull);
+      searchZoomOffset
+        .copy(baseline.position)
+        .sub(baseline.target)
+        .multiplyScalar(cubeSceneTheme.searchHighlightZoom.distanceMultiplier);
+
+      searchHighlightZoom = {
+        startTime: performance.now(),
+        fromPosition: camera.position.clone(),
+        fromTarget: controls.target.clone(),
+        toPosition: searchZoomTarget.clone().add(searchZoomOffset),
+        toTarget: searchZoomTarget.clone(),
+      };
+    };
+
+    const updateSearchHighlightZoom = (frameTime: number) => {
+      if (!searchHighlightZoom || viewMode !== "map") {
+        return;
+      }
+
+      const progress =
+        (frameTime - searchHighlightZoom.startTime) / cubeSceneTheme.searchHighlightZoom.durationMs;
+      const easedProgress = easeOutCubic(progress);
+
+      camera.position.lerpVectors(
+        searchHighlightZoom.fromPosition,
+        searchHighlightZoom.toPosition,
+        easedProgress,
+      );
+      controls.target.lerpVectors(
+        searchHighlightZoom.fromTarget,
+        searchHighlightZoom.toTarget,
+        easedProgress,
+      );
+
+      if (progress >= 1) {
+        camera.position.copy(searchHighlightZoom.toPosition);
+        controls.target.copy(searchHighlightZoom.toTarget);
+        searchHighlightZoom = null;
+      }
+    };
+
+    const setDefaultCubeTargets = () => {
+      cubeMeshes.forEach((mesh) => {
+        mesh.userData.targetPosition.copy(mesh.userData.basePosition);
+        mesh.userData.targetScale = 1;
+        mesh.userData.targetOpacity = mesh.userData.baseOpacity;
+        mesh.userData.targetOpacityMapMix = 0;
+      });
+    };
+
+    const spreadCubesFrom = (anchorMesh: CubeMesh) => {
+      const anchorPosition = anchorMesh.userData.basePosition;
+      const falloffDistance = CUBE_MAP_UNIT * cubeSceneTheme.hover.spreadFalloffUnits;
+
+      const buildCandidates = (spreadMultiplier: number) =>
+        cubeMeshes.map<TargetCandidate>((mesh) => {
+          const basePosition = mesh.userData.basePosition;
+          const scale = mesh === anchorMesh ? 1 : cubeSceneTheme.hover.dimScale;
+          const position = basePosition.clone();
+
+          if (mesh !== anchorMesh) {
+            spreadDirection.copy(basePosition).sub(anchorPosition);
+            const distance = Math.max(spreadDirection.length(), 0.001);
+            const influence = THREE.MathUtils.clamp(
+              1 - distance / falloffDistance,
+              cubeSceneTheme.hover.spreadMinInfluence,
+              1,
+            );
+
+            position.add(
+              spreadDirection
+                .normalize()
+                .multiplyScalar(cubeSceneTheme.hover.spreadDistance * influence * spreadMultiplier),
+            );
+          }
+
+          clampTargetToBounds(position, scale);
+
+          return {
+            mesh,
+            position,
+            scale,
+          };
+        });
+
+      let selectedCandidates = buildCandidates(0);
+
+      for (
+        let spreadMultiplier = 1;
+        spreadMultiplier >= 0;
+        spreadMultiplier -= cubeSceneTheme.hover.collisionStep
+      ) {
+        const candidates = buildCandidates(Math.max(0, spreadMultiplier));
+
+        if (!hasTargetCollision(candidates)) {
+          selectedCandidates = candidates;
+          break;
+        }
+      }
+
+      selectedCandidates.forEach(({ mesh, position, scale }) => {
+        mesh.userData.targetPosition.copy(position);
+        mesh.userData.targetScale = scale;
+
+        if (mesh === anchorMesh) {
+          mesh.userData.targetOpacity = cubeSceneTheme.hover.highlightOpacity;
+          return;
+        }
+
+        mesh.userData.targetOpacity =
+          mesh.userData.baseOpacity * cubeSceneTheme.hover.dimOpacityMultiplier;
+      });
+    };
+
+    const applyHoverHighlightTarget = (targetMesh: CubeMesh | null) => {
+      if (!targetMesh) {
+        setDefaultCubeTargets();
+        return;
+      }
+
+      outlineSource = targetMesh;
+      spreadCubesFrom(targetMesh);
+    };
+
+    const applySearchHighlightTarget = () => {
+      if (!selectedMesh) {
+        setDefaultCubeTargets();
+        return;
+      }
+
+      outlineSource = selectedMesh;
+      cubeMeshes.forEach((mesh) => {
+        mesh.userData.targetPosition.copy(mesh.userData.basePosition);
+        mesh.userData.targetScale = 1;
+        mesh.userData.targetOpacity =
+          mesh === selectedMesh ? cubeSceneTheme.hover.highlightOpacity : SEARCH_DIMMED_OPACITY;
+        mesh.userData.targetOpacityMapMix = 0;
+      });
+    };
+
+    const applyOrbitViewTargets = () => {
+      if (!focusedMesh) {
+        return;
+      }
+
+      outlineSource = focusedMesh;
+      cubeMeshes.forEach((mesh) => {
+        mesh.userData.targetPosition.copy(
+          mesh === focusedMesh ? GRAPH_CENTER : mesh.userData.basePosition,
+        );
+        mesh.userData.targetScale = mesh === focusedMesh ? cubeSceneTheme.orbitView.focusedScale : 0;
+        mesh.userData.targetOpacity = mesh === focusedMesh ? cubeSceneTheme.hover.highlightOpacity : 0;
+        mesh.userData.targetOpacityMapMix = mesh === focusedMesh ? 1 : 0;
+      });
+    };
+
+    const disposeStoryThumbnailCube = () => {
+      if (!storyThumbnailCube) {
+        return;
+      }
+
+      storyThumbnailCube.parent?.remove(storyThumbnailCube);
+      storyThumbnailCube.geometry.dispose();
+      storyThumbnailCube.material.forEach((material) => material.dispose());
+      storyThumbnailCube = null;
+      delete container.dataset.storyThumbnailFaces;
+    };
+
+    const createStoryThumbnailCube = () => {
+      if (!focusedMesh || storyThumbnailTextures.length === 0) {
+        return;
+      }
+
+      disposeStoryThumbnailCube();
+
+      const shuffledTextures = shuffleItems(storyThumbnailTextures);
+      const faceTextures = Array.from(
+        { length: 6 },
+        (_, index) => shuffledTextures[index % shuffledTextures.length],
+      );
+      const storyGeometry = new THREE.BoxGeometry(CUBE_MAP_UNIT, CUBE_MAP_UNIT, CUBE_MAP_UNIT);
+      const storyMaterials = faceTextures.map(
+        (texture) =>
+          new THREE.MeshBasicMaterial({
+            map: texture,
+            side: THREE.DoubleSide,
+            toneMapped: false,
+          }),
+      );
+
+      storyThumbnailCube = new THREE.Mesh(storyGeometry, storyMaterials);
+      storyThumbnailCube.name = "Single Cube Orbit View Story Thumbnail Cube";
+      storyThumbnailCube.frustumCulled = false;
+      storyThumbnailCube.position.set(0, 0, 0);
+      storyThumbnailCube.rotation.set(0, 0, 0);
+      storyThumbnailCube.scale.setScalar(cubeSceneTheme.orbitView.storyCube.scale);
+      storyThumbnailCube.userData.isStoryThumbnailCube = true;
+      focusedMesh.add(storyThumbnailCube);
+      container.dataset.storyThumbnailFaces = faceTextures
+        .map((texture) => texture.source?.data?.currentSrc || texture.source?.data?.src || "story-thumbnail")
+        .join(",");
+    };
+
+    const enterOrbitView = () => {
+      if (!selectedMesh || viewMode === "orbit") {
+        return;
+      }
+
+      cancelSearchHighlightZoom();
+      viewMode = "orbit";
+      focusedMesh = selectedMesh;
+      hovered = null;
+      outlineSource = selectedMesh;
+      savedMapCameraState = {
+        position: camera.position.clone(),
+        target: controls.target.clone(),
+        minDistance: controls.minDistance,
+        maxDistance: controls.maxDistance,
+        enablePan: controls.enablePan,
+      };
+      container.dataset.cubeViewMode = "orbit";
+      container.dataset.focusedCubeKey = selectedMesh.userData.key;
+      container.style.cursor = "grab";
+      applyOrbitControls();
+      applyOrbitViewTargets();
+      createStoryThumbnailCube();
+      notifyOrbitViewChange();
+    };
+
+    const exitOrbitView = () => {
+      if (viewMode !== "orbit") {
+        return;
+      }
+
+      viewMode = "map";
+      disposeStoryThumbnailCube();
+      focusedMesh = null;
+      delete container.dataset.focusedCubeKey;
+      container.dataset.cubeViewMode = "map";
+      container.style.cursor = "default";
+
+      if (savedMapCameraState) {
+        camera.position.copy(savedMapCameraState.position);
+        controls.target.copy(savedMapCameraState.target);
+        controls.minDistance = savedMapCameraState.minDistance;
+        controls.maxDistance = savedMapCameraState.maxDistance;
+        controls.enablePan = savedMapCameraState.enablePan;
+        savedMapCameraState = null;
+      } else {
+        applyMapControls();
+        controls.target.copy(GRAPH_CENTER);
+      }
+
+      controls.update();
+
+      if (selectedMesh) {
+        applySearchHighlightTarget();
+      } else {
+        setDefaultCubeTargets();
+      }
+
+      notifyOrbitViewChange();
+    };
+
+    const clearSearchHighlight = () => {
+      exitOrbitView();
+      resetSearchHighlightZoom();
+      selectedMesh = null;
+      hovered = null;
+      delete container.dataset.searchHighlightKey;
+      container.style.cursor = "default";
+      outlineSource = null;
+      setDefaultCubeTargets();
+    };
+
+    const selectRandomSearchHighlight = () => {
+      if (!cubeAssetsReady || cubeMeshes.length === 0) {
+        pendingHighlightRequestIdRef.current = Math.max(pendingHighlightRequestIdRef.current, 1);
+        return;
+      }
+
+      exitOrbitView();
+      const candidates =
+        selectedMesh && cubeMeshes.length > 1
+          ? cubeMeshes.filter((mesh) => mesh !== selectedMesh)
+          : cubeMeshes;
+      selectedMesh = candidates[Math.floor(Math.random() * candidates.length)];
+      container.dataset.searchHighlightKey = selectedMesh.userData.key;
+      hovered = null;
+      container.style.cursor = "default";
+      applySearchHighlightTarget();
+      startSearchHighlightZoom(selectedMesh);
+    };
+
+    const loadCubeAssets = async () => {
+      const textureLoader = new THREE.TextureLoader();
+
+      try {
+        const [geometry, opacityMask, orbitOpacityMask, emissiveMask, storyTextures] =
+          await Promise.all([
+            loadCubeModelGeometry(cubeSceneTheme.cube.model.src),
+            loadCubeMaskTexture(cubeSceneTheme.cube.model.opacityMaskSrc, textureLoader),
+            loadCubeMaskTexture(cubeSceneTheme.orbitView.opacityMaskSrc, textureLoader),
+            loadCubeMaskTexture(cubeSceneTheme.cube.model.emissiveMaskSrc, textureLoader),
+            loadStoryThumbnailTextures(
+              cubeSceneTheme.orbitView.storyCube.textureSrcs,
+              textureLoader,
+            ),
+          ]);
+
+        if (disposed) {
+          geometry.dispose();
+          opacityMask.dispose();
+          orbitOpacityMask.dispose();
+          emissiveMask.dispose();
+          storyTextures.forEach((texture) => texture.dispose());
+          return;
+        }
+
+        storyThumbnailTextures = storyTextures;
+        createCubeMeshes(geometry, opacityMask, orbitOpacityMask, emissiveMask);
+
+        if (pendingHighlightRequestIdRef.current > 0) {
+          pendingHighlightRequestIdRef.current = 0;
+          selectRandomSearchHighlight();
+        }
+      } catch (error) {
+        if (!disposed) {
+          console.error("Failed to load cube scene assets.", error);
+        }
+      }
+    };
+
+    searchHighlightHandlerRef.current = selectRandomSearchHighlight;
+    exitOrbitViewHandlerRef.current = exitOrbitView;
+    void loadCubeAssets();
+
+    const updatePointer = (event: PointerEvent) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      isPointerInside = true;
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    };
+
+    const getIntersectedCubes = () => {
+      raycaster.setFromCamera(pointer, camera);
+      return raycaster
+        .intersectObjects(cubeMeshes, false)
+        .map((intersection) => intersection.object as CubeMesh);
+    };
+
+    const getIntersectedCube = () => {
+      const intersections = getIntersectedCubes();
+
+      if (isSearchHighlightActive() && selectedMesh && intersections.includes(selectedMesh)) {
+        return selectedMesh;
+      }
+
+      return intersections[0] ?? null;
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      hasPointerDown = true;
+      pointerDownPosition.set(event.clientX, event.clientY);
+
+      if (viewMode === "orbit") {
+        container.style.cursor = "grabbing";
+      }
+    };
+
+    const handlePointerUp = (event: PointerEvent) => {
+      if (viewMode === "orbit") {
+        hasPointerDown = false;
+        container.style.cursor = "grab";
+        return;
+      }
+
+      if (!selectedMesh || !hasPointerDown) {
+        hasPointerDown = false;
+        return;
+      }
+
+      const pointerTravel = Math.hypot(
+        event.clientX - pointerDownPosition.x,
+        event.clientY - pointerDownPosition.y,
+      );
+      hasPointerDown = false;
+
+      if (pointerTravel > EMPTY_SPACE_CLICK_THRESHOLD) {
+        return;
+      }
+
+      updatePointer(event);
+
+      const intersectedCube = getIntersectedCube();
+
+      if (intersectedCube === selectedMesh) {
+        enterOrbitView();
+        return;
+      }
+
+      if (!intersectedCube) {
+        clearSearchHighlight();
+      }
+    };
+
+    const handleControlsStart = () => {
+      if (viewMode === "map" && searchHighlightZoom) {
+        cancelSearchHighlightZoom(true);
+      }
+    };
+
+    const handleControlsEnd = () => {
+      if (viewMode !== "map" || !selectedMesh || searchHighlightZoom) {
+        return;
+      }
+
+      searchHighlightZoomBaseline = {
+        position: camera.position.clone(),
+        target: controls.target.clone(),
+      };
+    };
+
+    const clearHover = () => {
+      isPointerInside = false;
+      hovered = null;
+      pointer.set(-9999, -9999);
+      hasPointerDown = false;
+      if (viewMode === "orbit") {
+        container.style.cursor = "grab";
+        applyOrbitViewTargets();
+        return;
+      }
+
+      container.style.cursor = "default";
+      if (selectedMesh) {
+        applySearchHighlightTarget();
+      } else {
+        setDefaultCubeTargets();
+      }
+    };
+
+    const updateHoveredCube = () => {
+      if (viewMode === "orbit" || !isPointerInside) {
+        return;
+      }
+
+      const intersectedCube = getIntersectedCube();
+      const nextHovered = selectedMesh
+        ? intersectedCube === selectedMesh
+          ? selectedMesh
+          : null
+        : intersectedCube;
+
+      if (nextHovered === hovered) {
+        return;
+      }
+
+      hovered = nextHovered;
+
+      if (selectedMesh) {
+        container.style.cursor = hovered ? "pointer" : "default";
+        applySearchHighlightTarget();
+        return;
+      }
+
+      if (hovered) {
+        outlineSource = hovered;
+        container.style.cursor = "pointer";
+        spreadCubesFrom(hovered);
+      } else {
+        container.style.cursor = "default";
+        applyHoverHighlightTarget(null);
+      }
+    };
+
+    const resize = () => {
+      const rect = container.getBoundingClientRect();
+      const width = Math.max(1, Math.floor(rect.width));
+      const height = Math.max(1, Math.floor(rect.height));
+
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height, false);
+
+      const pixelRatio = renderer.getPixelRatio();
+      const bufferWidth = Math.max(1, Math.floor(width * pixelRatio));
+      const bufferHeight = Math.max(1, Math.floor(height * pixelRatio));
+      maskRenderTarget.setSize(bufferWidth, bufferHeight);
+      outlineMaterial.uniforms.resolution.value.set(bufferWidth, bufferHeight);
+    };
+
+    const resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(container);
+    resize();
+    requestAnimationFrame(resize);
+
+    renderer.domElement.addEventListener("pointermove", updatePointer);
+    renderer.domElement.addEventListener("pointerdown", handlePointerDown);
+    renderer.domElement.addEventListener("pointerup", handlePointerUp);
+    renderer.domElement.addEventListener("pointerleave", clearHover);
+    renderer.domElement.addEventListener("pointercancel", clearHover);
+    controls.addEventListener("start", handleControlsStart);
+    controls.addEventListener("end", handleControlsEnd);
+
+    const render = () => {
+      if (disposed) {
+        return;
+      }
+
+      animationFrame = requestAnimationFrame(render);
+      const frameTime = performance.now();
+      updateSearchHighlightZoom(frameTime);
+      controls.update();
+
+      if (viewMode === "orbit") {
+        gridPlanes.forEach((gridPlane) => {
+          gridPlane.visible = false;
+        });
+      } else {
+        updateGridPlaneVisibility(
+          gridPlanes,
+          camera,
+          cubeSceneTheme.grid.backfaceHideEpsilon ?? 0,
+        );
+        updateHoveredCube();
+      }
+
+      const sceneTime = frameTime * 0.001;
+      cubeMeshes.forEach((mesh) => {
+        const elapsed = frameTime - mesh.userData.enterStart;
+
+        if (elapsed < 0) {
+          mesh.userData.entryProgress = 0;
+        } else if (elapsed < mesh.userData.enterDuration) {
+          mesh.userData.entryProgress = outCirc(elapsed / mesh.userData.enterDuration);
+        } else {
+          mesh.userData.entryProgress = 1;
+          mesh.userData.entryComplete = true;
+        }
+
+        mesh.position.lerp(mesh.userData.targetPosition, cubeSceneTheme.hover.positionLerp);
+        targetScaleVector.setScalar(mesh.userData.targetScale * mesh.userData.entryProgress);
+        mesh.scale.lerp(targetScaleVector, cubeSceneTheme.hover.scaleLerp);
+
+        const { material } = mesh;
+        const opacity = lerpValue(
+          material.uniforms.uOpacity.value,
+          mesh.userData.targetOpacity,
+          cubeSceneTheme.hover.materialLerp,
+        );
+        material.uniforms.uOpacity.value = opacity;
+        material.uniforms.uTime.value = sceneTime;
+
+        if (material.uniforms.uOpacityMapMix) {
+          material.uniforms.uOpacityMapMix.value = lerpValue(
+            material.uniforms.uOpacityMapMix.value,
+            mesh.userData.targetOpacityMapMix,
+            cubeSceneTheme.orbitView.opacityMaskTransitionLerp,
+          );
+        }
+
+        material.opacity = opacity;
+      });
+
+      const activeHighlight = focusedMesh ?? selectedMesh ?? hovered;
+      outlineOpacity = lerpValue(
+        outlineOpacity,
+        activeHighlight ? 1 : 0,
+        cubeSceneTheme.hoverGlow.fadeLerp,
+      );
+      const shouldRenderOutline = Boolean(outlineSource && outlineOpacity > 0.01);
+
+      const shouldRenderOutlineMesh = Boolean(maskMesh && shouldRenderOutline);
+
+      if (maskMesh) {
+        maskMesh.visible = shouldRenderOutlineMesh;
+      }
+      renderer.setRenderTarget(maskRenderTarget);
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear(true, true, true);
+
+      if (shouldRenderOutlineMesh && outlineSource && maskMesh) {
+        maskMesh.visible = false;
+        const shouldUseOutlineOcclusion = viewMode === "map" && !isSearchHighlightActive();
+
+        if (shouldUseOutlineOcclusion) {
+          maskOccludersGroup.visible = true;
+          cubeMeshes.forEach((mesh) => {
+            const { maskOccluder } = mesh.userData;
+            const shouldOcclude = mesh !== outlineSource && mesh.userData.entryProgress > 0.001;
+            maskOccluder.visible = shouldOcclude;
+
+            if (shouldOcclude) {
+              mesh.updateWorldMatrix(true, false);
+              maskOccluder.matrix.copy(mesh.matrixWorld);
+              maskOccluder.matrixWorldNeedsUpdate = true;
+              maskOccluder.updateMatrixWorld(true);
+            }
+          });
+          renderer.render(maskScene, camera);
+        } else {
+          maskOccludersGroup.visible = false;
+        }
+
+        maskOccludersGroup.visible = false;
+        outlineSource.updateWorldMatrix(true, false);
+        maskMesh.visible = true;
+        maskMesh.matrix.copy(outlineSource.matrixWorld);
+        maskMesh.matrixWorldNeedsUpdate = true;
+        maskMesh.updateMatrixWorld(true);
+        renderer.render(maskScene, camera);
+        maskMesh.visible = false;
+      } else if (!activeHighlight) {
+        maskOccludersGroup.visible = false;
+        outlineSource = null;
+        outlineOpacity = 0;
+      }
+
+      renderer.setRenderTarget(null);
+      renderer.setClearColor(cubeSceneTheme.background, 1);
+      renderer.clear(true, true, true);
+      renderer.render(scene, camera);
+
+      if (shouldRenderOutlineMesh) {
+        outlineMaterial.uniforms.time.value = sceneTime;
+        outlineMaterial.uniforms.opacity.value = outlineOpacity;
+        renderer.render(overlayScene, overlayCamera);
+      }
+    };
+
+    render();
+
+    return () => {
+      disposed = true;
+      cancelAnimationFrame(animationFrame);
+      resizeObserver.disconnect();
+      renderer.domElement.removeEventListener("pointermove", updatePointer);
+      renderer.domElement.removeEventListener("pointerdown", handlePointerDown);
+      renderer.domElement.removeEventListener("pointerup", handlePointerUp);
+      renderer.domElement.removeEventListener("pointerleave", clearHover);
+      renderer.domElement.removeEventListener("pointercancel", clearHover);
+      controls.removeEventListener("start", handleControlsStart);
+      controls.removeEventListener("end", handleControlsEnd);
+      searchHighlightHandlerRef.current = null;
+      exitOrbitViewHandlerRef.current = null;
+      if (viewMode === "orbit") {
+        orbitViewChangeRef.current?.(false);
+      }
+      controls.dispose();
+      disposeStoryThumbnailCube();
+      disposeObject(scene);
+      nodeGeometry?.dispose();
+      opacityMaskTexture?.dispose();
+      orbitOpacityMaskTexture?.dispose();
+      emissiveMaskTexture?.dispose();
+      storyThumbnailTextures.forEach((texture) => texture.dispose());
+      maskRenderTarget.dispose();
+      maskMaterial.dispose();
+      maskOccluderMaterial.dispose();
+      overlayGeometry.dispose();
+      outlineMaterial.dispose();
+      renderer.dispose();
+      renderer.domElement.remove();
+    };
+  }, []);
+
+  return <div ref={containerRef} className="cube-scene" data-layer-name="Cube Map 3D Scene" />;
+}

@@ -74,7 +74,7 @@ export function useStageScale() {
 
 type PrototypeStageProps = {
   children: ReactNode;
-  backgroundSrc: string;
+  backgroundSrc: string | null;
   backgroundImageClassName?: string;
   backgroundOverlayClassName?: string;
 };
@@ -153,15 +153,19 @@ export function PrototypeStage({
   const [viewportMetrics, setViewportMetrics] = useState(() =>
     getStageViewportMetrics(),
   );
-  const [backgroundLayers, setBackgroundLayers] = useState<BackgroundLayer[]>([
-    {
-      id: 0,
-      src: backgroundSrc,
-      imageClassName: backgroundImageClassName,
-      overlayClassName: backgroundOverlayClassName,
-      isActive: true,
-    },
-  ]);
+  const [backgroundLayers, setBackgroundLayers] = useState<BackgroundLayer[]>(() =>
+    backgroundSrc
+      ? [
+          {
+            id: 0,
+            src: backgroundSrc,
+            imageClassName: backgroundImageClassName,
+            overlayClassName: backgroundOverlayClassName,
+            isActive: true,
+          },
+        ]
+      : [],
+  );
 
   useEffect(() => {
     const handleResize = () => setViewportMetrics(getStageViewportMetrics());
@@ -175,6 +179,14 @@ export function PrototypeStage({
   useEffect(() => {
     setBackgroundLayers((currentLayers) => {
       const currentLayer = currentLayers.find((layer) => layer.isActive);
+
+      if (!backgroundSrc) {
+        if (!currentLayer) {
+          return currentLayers;
+        }
+
+        return currentLayers.map((layer) => ({ ...layer, isActive: false }));
+      }
 
       if (
         currentLayer?.src === backgroundSrc &&
