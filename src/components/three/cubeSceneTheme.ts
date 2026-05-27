@@ -26,6 +26,11 @@ export const cubeSceneTheme = {
     distanceMultiplier: 0.7,
     targetPull: 0.12,
   },
+  mapView: {
+    baseColor: "#bfc1c3",
+    opacityMaskStrength: 0,
+    emissiveStrength: 0,
+  },
   orbitView: {
     focusedScale: 4.5,
     cameraDistance: 500,

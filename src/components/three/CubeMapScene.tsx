@@ -55,7 +55,11 @@ type CubeMeshUserData = CubeMapOverviewNode & {
   entryComplete: boolean;
   baseOpacity: number;
   targetOpacity: number;
+  baseColor: THREE.Color;
+  targetBaseColor: THREE.Color;
   targetOpacityMapMix: number;
+  targetOpacityMaskStrength: number;
+  targetEmissiveStrength: number;
   targetFrontViewFadeStrength: number;
   maskOccluder: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
 };
@@ -734,6 +738,7 @@ export default function CubeMapScene({
 
     const primaryLight = cubeSceneTheme.lights.directional[0];
     const shaderTheme = cubeSceneTheme.cube.shader;
+    const mapViewBaseColor = new THREE.Color(cubeSceneTheme.mapView.baseColor);
     const ambientColor = new THREE.Color(cubeSceneTheme.lights.ambient.color).multiplyScalar(
       cubeSceneTheme.lights.ambient.intensity,
     );
@@ -763,9 +768,9 @@ export default function CubeMapScene({
           node.y * CUBE_MAP_UNIT,
           node.z * CUBE_MAP_UNIT,
         );
-        const cubeBaseColor = getCubeBaseColor(node, index);
+        const cubeBaseColor = new THREE.Color(getCubeBaseColor(node, index));
         const material = createCookTorranceMaterial({
-          baseColor: cubeBaseColor,
+          baseColor: mapViewBaseColor,
           roughness: shaderTheme.roughness,
           metallic: shaderTheme.metallic,
           lightDirection: primaryLight.position,
@@ -791,9 +796,10 @@ export default function CubeMapScene({
           opacityMap: opacityMask,
           orbitOpacityMap: orbitOpacityMask,
           opacityMapMix: 0,
+          opacityMaskStrength: cubeSceneTheme.mapView.opacityMaskStrength,
           emissiveMap: emissiveMask,
           emissiveColor: shaderTheme.emissiveColor,
-          emissiveStrength: shaderTheme.emissiveStrength,
+          emissiveStrength: cubeSceneTheme.mapView.emissiveStrength,
           frontViewFadeStrength: 0,
           frontViewFadePower: cubeSceneTheme.orbitView.frontViewFade.power,
           frontViewAlphaMultiplier: cubeSceneTheme.orbitView.frontViewFade.alphaMultiplier,
@@ -825,7 +831,11 @@ export default function CubeMapScene({
           entryComplete: false,
           baseOpacity: cubeSceneTheme.cube.opacity,
           targetOpacity: cubeSceneTheme.cube.opacity,
+          baseColor: cubeBaseColor,
+          targetBaseColor: mapViewBaseColor.clone(),
           targetOpacityMapMix: 0,
+          targetOpacityMaskStrength: cubeSceneTheme.mapView.opacityMaskStrength,
+          targetEmissiveStrength: cubeSceneTheme.mapView.emissiveStrength,
           targetFrontViewFadeStrength: 0,
           maskOccluder,
         };
@@ -961,6 +971,18 @@ export default function CubeMapScene({
       searchHighlightZoomBaseline = null;
     };
 
+    const setMapViewMaterialTargets = (mesh: CubeMesh) => {
+      mesh.userData.targetBaseColor.copy(mapViewBaseColor);
+      mesh.userData.targetOpacityMaskStrength = cubeSceneTheme.mapView.opacityMaskStrength;
+      mesh.userData.targetEmissiveStrength = cubeSceneTheme.mapView.emissiveStrength;
+    };
+
+    const setOrbitViewMaterialTargets = (mesh: CubeMesh) => {
+      mesh.userData.targetBaseColor.copy(mesh.userData.baseColor);
+      mesh.userData.targetOpacityMaskStrength = 1;
+      mesh.userData.targetEmissiveStrength = shaderTheme.emissiveStrength;
+    };
+
     const startSearchHighlightZoom = (targetMesh: CubeMesh) => {
       const baseline =
         searchHighlightZoomBaseline ??
@@ -1020,6 +1042,7 @@ export default function CubeMapScene({
         mesh.userData.targetScale = 1;
         mesh.userData.targetOpacity = mesh.userData.baseOpacity;
         mesh.userData.targetOpacityMapMix = 0;
+        setMapViewMaterialTargets(mesh);
         mesh.userData.targetFrontViewFadeStrength = 0;
       });
     };
@@ -1077,6 +1100,9 @@ export default function CubeMapScene({
       selectedCandidates.forEach(({ mesh, position, scale }) => {
         mesh.userData.targetPosition.copy(position);
         mesh.userData.targetScale = scale;
+        mesh.userData.targetOpacityMapMix = 0;
+        setMapViewMaterialTargets(mesh);
+        mesh.userData.targetFrontViewFadeStrength = 0;
 
         if (mesh === anchorMesh) {
           mesh.userData.targetOpacity = cubeSceneTheme.hover.highlightOpacity;
@@ -1114,6 +1140,7 @@ export default function CubeMapScene({
         mesh.userData.targetOpacity =
           mesh === selectedMesh ? cubeSceneTheme.hover.highlightOpacity : SEARCH_DIMMED_OPACITY;
         mesh.userData.targetOpacityMapMix = 0;
+        setMapViewMaterialTargets(mesh);
         mesh.userData.targetFrontViewFadeStrength = 0;
       });
     };
@@ -1131,6 +1158,11 @@ export default function CubeMapScene({
         mesh.userData.targetScale = mesh === focusedMesh ? cubeSceneTheme.orbitView.focusedScale : 0;
         mesh.userData.targetOpacity = mesh === focusedMesh ? cubeSceneTheme.hover.highlightOpacity : 0;
         mesh.userData.targetOpacityMapMix = mesh === focusedMesh ? 1 : 0;
+        if (mesh === focusedMesh) {
+          setOrbitViewMaterialTargets(mesh);
+        } else {
+          setMapViewMaterialTargets(mesh);
+        }
         mesh.userData.targetFrontViewFadeStrength =
           mesh === focusedMesh ? cubeSceneTheme.orbitView.frontViewFade.strength : 0;
       });
@@ -1555,12 +1587,32 @@ export default function CubeMapScene({
         );
         material.uniforms.uOpacity.value = opacity;
         material.uniforms.uTime.value = sceneTime;
+        material.uniforms.uBaseColor.value.lerp(
+          mesh.userData.targetBaseColor,
+          cubeSceneTheme.hover.materialLerp,
+        );
 
         if (material.uniforms.uOpacityMapMix) {
           material.uniforms.uOpacityMapMix.value = lerpValue(
             material.uniforms.uOpacityMapMix.value,
             mesh.userData.targetOpacityMapMix,
             cubeSceneTheme.orbitView.opacityMaskTransitionLerp,
+          );
+        }
+
+        if (material.uniforms.uOpacityMaskStrength) {
+          material.uniforms.uOpacityMaskStrength.value = lerpValue(
+            material.uniforms.uOpacityMaskStrength.value,
+            mesh.userData.targetOpacityMaskStrength,
+            cubeSceneTheme.orbitView.opacityMaskTransitionLerp,
+          );
+        }
+
+        if (material.uniforms.uEmissiveStrength) {
+          material.uniforms.uEmissiveStrength.value = lerpValue(
+            material.uniforms.uEmissiveStrength.value,
+            mesh.userData.targetEmissiveStrength,
+            cubeSceneTheme.hover.materialLerp,
           );
         }
 

@@ -53,6 +53,7 @@ const fragmentShader = `
   uniform sampler2D uOrbitOpacityMap;
   uniform float uUseOrbitOpacityMap;
   uniform float uOpacityMapMix;
+  uniform float uOpacityMaskStrength;
   uniform sampler2D uEmissiveMap;
   uniform float uUseEmissiveMap;
   uniform vec3 uEmissiveColor;
@@ -233,6 +234,7 @@ const fragmentShader = `
 
       opacityMask = 1.0 - clamp(sourceOpacityMask, 0.0, 1.0);
     }
+    opacityMask = mix(1.0, opacityMask, clamp(uOpacityMaskStrength, 0.0, 1.0));
 
     if (uUseEmissiveMap > 0.5) {
       vec4 emissiveSample = texture2D(uEmissiveMap, vUv);
@@ -291,6 +293,7 @@ type CookTorranceMaterialOptions = {
   opacityMap?: THREE.Texture | null;
   orbitOpacityMap?: THREE.Texture | null;
   opacityMapMix?: number;
+  opacityMaskStrength?: number;
   emissiveMap?: THREE.Texture | null;
   emissiveColor?: THREE.ColorRepresentation;
   emissiveStrength?: number;
@@ -328,6 +331,7 @@ export function createCookTorranceMaterial({
   opacityMap = null,
   orbitOpacityMap = null,
   opacityMapMix = 0,
+  opacityMaskStrength = 1,
   emissiveMap = null,
   emissiveColor = "#d7e6ff",
   emissiveStrength = 0,
@@ -368,6 +372,7 @@ export function createCookTorranceMaterial({
       uOrbitOpacityMap: { value: orbitOpacityMap ?? opacityMap },
       uUseOrbitOpacityMap: { value: orbitOpacityMap ? 1 : 0 },
       uOpacityMapMix: { value: opacityMapMix },
+      uOpacityMaskStrength: { value: opacityMaskStrength },
       uEmissiveMap: { value: emissiveMap },
       uUseEmissiveMap: { value: emissiveMap ? 1 : 0 },
       uEmissiveColor: { value: new THREE.Color(emissiveColor) },
