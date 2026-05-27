@@ -84,7 +84,7 @@ export function SearchScreen({ onOpenStoryDetail }: SearchScreenProps) {
                 iconSrc={prototypeAssets.personIcon}
                 label="Profile"
                 variant="light"
-                className="h-[54px] w-[64px] border-0"
+                className="!h-[54px] !w-[64px] border-0"
                 nodeId="15:99"
                 dataName="nav/icon-button - profile"
               />
@@ -92,7 +92,7 @@ export function SearchScreen({ onOpenStoryDetail }: SearchScreenProps) {
                 iconSrc={prototypeAssets.secondaryIcon01}
                 label="Secondary action 1"
                 variant="light"
-                className="h-[54px] w-[64px] border-0"
+                className="!h-[54px] !w-[64px] border-0"
                 nodeId="15:101"
                 dataName="nav/icon-button - secondary-action-01"
               />
@@ -100,7 +100,7 @@ export function SearchScreen({ onOpenStoryDetail }: SearchScreenProps) {
                 iconSrc={prototypeAssets.secondaryIcon02}
                 label="Secondary action 2"
                 variant="light"
-                className="h-[54px] w-[64px] border-0"
+                className="!h-[54px] !w-[64px] border-0"
                 nodeId="15:104"
                 dataName="nav/icon-button - secondary-action-02"
               />
