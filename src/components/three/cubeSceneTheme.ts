@@ -1,5 +1,5 @@
 export const cubeSceneTheme = {
-  background: "#ffffff",
+  background: "#d6d6d6",
   rendering: {
     toneMappingExposure: 0.9,
   },
@@ -34,6 +34,18 @@ export const cubeSceneTheme = {
     cameraOffset: [64, 42, 76],
     opacityMaskSrc: "/assets/models/cube%20mask%20textures/Cube%20Opacity%20Mask_2.png",
     opacityMaskTransitionLerp: 0.08,
+    autoRotate: {
+      enabled: true,
+      speed: 0.55,
+      resumeDelayMs: 1500,
+    },
+    frontViewFade: {
+      strength: 1.0,
+      power: 2.4,
+      alphaMultiplier: 0.38,
+      saturationMultiplier: 0.8,
+      transitionLerp: 0.08,
+    },
     storyCube: {
       scale: 0.9,
       textureSrcs: [

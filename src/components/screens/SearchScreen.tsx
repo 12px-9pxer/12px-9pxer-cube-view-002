@@ -4,8 +4,6 @@ import { CubeScenePlaceholder } from "../three/CubeScenePlaceholder";
 import { AnimatedButton } from "../ui/AnimatedButton";
 import { ArrowGlyph } from "../ui/ArrowGlyph";
 import { GlassIconButton } from "../ui/GlassIconButton";
-import { SingleCubeStoryCard } from "../ui/SingleCubeStoryCard";
-import { UserStoryLogo } from "../ui/UserStoryLogo";
 
 type SearchScreenProps = {
   onOpenStoryDetail: () => void;
@@ -51,16 +49,19 @@ export function SearchScreen({ onOpenStoryDetail }: SearchScreenProps) {
             <span>Back</span>
           </AnimatedButton>
 
-          <SingleCubeStoryCard onOpenStoryDetail={onOpenStoryDetail} />
+          <AnimatedButton
+            type="button"
+            onClick={onOpenStoryDetail}
+            className="absolute left-[var(--viewport-center-x)] top-[calc(var(--viewport-center-y)+360px)] z-20 flex h-[64px] w-[64px] -translate-x-1/2 items-center justify-center rounded-full bg-[#2c2c2d] text-white shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-[18px]"
+            data-name="button/orbit-open-story-detail"
+            aria-label="Open story detail"
+            title="Open story detail"
+          >
+            <ArrowGlyph />
+          </AnimatedButton>
         </>
       ) : (
         <>
-          <UserStoryLogo
-            className="absolute left-[calc(var(--safe-left)+86px)] top-[calc(var(--safe-top)+50px)] z-10 max-[900px]:hidden"
-            shadowClassName="drop-shadow-[0_1.33px_6.12px_rgba(0,0,0,0.23)]"
-            nodeId="15:151"
-          />
-
           <nav
             className="absolute left-[var(--viewport-center-x)] top-[calc(var(--safe-top)+44px)] z-10 flex h-[66px] w-[397.46px] max-w-[calc(var(--viewport-width)-32px)] -translate-x-1/2 rounded-full p-[6px] backdrop-blur-[70px]"
             data-node-id="15:93"
@@ -144,7 +145,7 @@ export function SearchScreen({ onOpenStoryDetail }: SearchScreenProps) {
                     data-name={
                       tag === prototypeText.searchTags[0]
                         ? "tag/ai-feature"
-                        : "tag/retirement-after-60"
+                        : "tag/working-mom"
                     }
                   >
                     {tag}

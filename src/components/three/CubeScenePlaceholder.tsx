@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 
 const CubeMapScene = lazy(() => import("./CubeMapScene"));
 
@@ -9,12 +9,35 @@ type CubeScenePlaceholderProps = {
   onOrbitViewChange?: (isOrbitView: boolean) => void;
 };
 
+function CubeSceneLoader() {
+  return (
+    <div className="cube-scene-loader" data-name="cube-scene/loading-indicator" aria-hidden="true">
+      <div className="cube-scene-loader-icon">
+        <span />
+        <span />
+        <span />
+      </div>
+      <div className="cube-scene-loader-track">
+        <span />
+      </div>
+    </div>
+  );
+}
+
 export function CubeScenePlaceholder({
   enabled = true,
   highlightRequestId = 0,
   exitOrbitViewRequestId = 0,
   onOrbitViewChange,
 }: CubeScenePlaceholderProps) {
+  const [isSceneReady, setIsSceneReady] = useState(false);
+
+  useEffect(() => {
+    if (enabled) {
+      setIsSceneReady(false);
+    }
+  }, [enabled]);
+
   if (!enabled) {
     return (
       <div
@@ -26,12 +49,16 @@ export function CubeScenePlaceholder({
   }
 
   return (
-    <Suspense fallback={null}>
-      <CubeMapScene
-        highlightRequestId={highlightRequestId}
-        exitOrbitViewRequestId={exitOrbitViewRequestId}
-        onOrbitViewChange={onOrbitViewChange}
-      />
-    </Suspense>
+    <>
+      <Suspense fallback={null}>
+        <CubeMapScene
+          highlightRequestId={highlightRequestId}
+          exitOrbitViewRequestId={exitOrbitViewRequestId}
+          onOrbitViewChange={onOrbitViewChange}
+          onSceneReady={() => setIsSceneReady(true)}
+        />
+      </Suspense>
+      {!isSceneReady ? <CubeSceneLoader /> : null}
+    </>
   );
 }

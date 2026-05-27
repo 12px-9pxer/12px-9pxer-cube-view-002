@@ -147,11 +147,11 @@ export const prototypeParams = {
       commentEnterEase: "back.out(1.55)",
       commentExitEase: "back.in(1.35)",
       /** 투표 카드는 Page3 진입 후 약간 기다렸다가 등장하도록 지연 시간을 둡니다. */
-      pollEnterDelay: 2,
+      pollEnterDelay: 0.5,
       /** 투표 카드가 scale 0에서 1로 커지는 시간입니다. */
-      pollEnterDuration: 0.42,
+      pollEnterDuration: 0.22,
       /** 투표 완료 상태를 보여준 뒤 카드가 사라지기 전까지 기다리는 시간입니다. */
-      pollExitDelay: 1,
+      pollExitDelay: 0.2,
       /** 투표 카드가 scale 1에서 0으로 줄어드는 시간입니다. */
       pollExitDuration: 0.32,
       /** 투표 카드 등장/퇴장에 사용하는 GSAP ease 값입니다. */

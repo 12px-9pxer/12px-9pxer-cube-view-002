@@ -57,6 +57,10 @@ const fragmentShader = `
   uniform float uUseEmissiveMap;
   uniform vec3 uEmissiveColor;
   uniform float uEmissiveStrength;
+  uniform float uFrontViewFadeStrength;
+  uniform float uFrontViewFadePower;
+  uniform float uFrontViewAlphaMultiplier;
+  uniform float uFrontViewSaturationMultiplier;
   uniform float uTime;
 
   varying vec3 vWorldPosition;
@@ -236,7 +240,25 @@ const fragmentShader = `
       color += uEmissiveColor * emissiveMask * max(uEmissiveStrength, 0.0);
     }
 
-    gl_FragColor = vec4(color, clamp(uOpacity * opacityMask, 0.0, 1.0));
+    float frontViewFactor =
+      pow(clamp(NdotV, 0.0, 1.0), max(uFrontViewFadePower, EPSILON)) *
+      clamp(uFrontViewFadeStrength, 0.0, 1.0);
+    float frontViewLuminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    vec3 frontViewDesaturated = mix(
+      vec3(frontViewLuminance),
+      color,
+      clamp(uFrontViewSaturationMultiplier, 0.0, 1.0)
+    );
+    color = mix(color, frontViewDesaturated, frontViewFactor);
+
+    float finalAlpha = clamp(uOpacity * opacityMask, 0.0, 1.0);
+    finalAlpha *= mix(
+      1.0,
+      clamp(uFrontViewAlphaMultiplier, 0.0, 1.0),
+      frontViewFactor
+    );
+
+    gl_FragColor = vec4(color, clamp(finalAlpha, 0.0, 1.0));
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
   }
@@ -272,6 +294,10 @@ type CookTorranceMaterialOptions = {
   emissiveMap?: THREE.Texture | null;
   emissiveColor?: THREE.ColorRepresentation;
   emissiveStrength?: number;
+  frontViewFadeStrength?: number;
+  frontViewFadePower?: number;
+  frontViewAlphaMultiplier?: number;
+  frontViewSaturationMultiplier?: number;
   opacity: number;
 };
 
@@ -305,6 +331,10 @@ export function createCookTorranceMaterial({
   emissiveMap = null,
   emissiveColor = "#d7e6ff",
   emissiveStrength = 0,
+  frontViewFadeStrength = 0,
+  frontViewFadePower = 1.8,
+  frontViewAlphaMultiplier = 0.38,
+  frontViewSaturationMultiplier = 0.45,
   opacity,
 }: CookTorranceMaterialOptions) {
   return new THREE.ShaderMaterial({
@@ -342,6 +372,10 @@ export function createCookTorranceMaterial({
       uUseEmissiveMap: { value: emissiveMap ? 1 : 0 },
       uEmissiveColor: { value: new THREE.Color(emissiveColor) },
       uEmissiveStrength: { value: emissiveStrength },
+      uFrontViewFadeStrength: { value: frontViewFadeStrength },
+      uFrontViewFadePower: { value: frontViewFadePower },
+      uFrontViewAlphaMultiplier: { value: frontViewAlphaMultiplier },
+      uFrontViewSaturationMultiplier: { value: frontViewSaturationMultiplier },
       uTime: { value: 0 },
     },
     vertexShader,

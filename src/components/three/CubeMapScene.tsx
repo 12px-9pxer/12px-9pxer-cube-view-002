@@ -56,6 +56,7 @@ type CubeMeshUserData = CubeMapOverviewNode & {
   baseOpacity: number;
   targetOpacity: number;
   targetOpacityMapMix: number;
+  targetFrontViewFadeStrength: number;
   maskOccluder: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
 };
 
@@ -531,6 +532,7 @@ type CubeMapSceneProps = {
   highlightRequestId?: number;
   exitOrbitViewRequestId?: number;
   onOrbitViewChange?: (isOrbitView: boolean) => void;
+  onSceneReady?: () => void;
 };
 
 type CubeViewMode = "map" | "orbit";
@@ -539,16 +541,22 @@ export default function CubeMapScene({
   highlightRequestId = 0,
   exitOrbitViewRequestId = 0,
   onOrbitViewChange,
+  onSceneReady,
 }: CubeMapSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const searchHighlightHandlerRef = useRef<(() => void) | null>(null);
   const exitOrbitViewHandlerRef = useRef<(() => void) | null>(null);
   const orbitViewChangeRef = useRef(onOrbitViewChange);
+  const sceneReadyRef = useRef(onSceneReady);
   const pendingHighlightRequestIdRef = useRef(0);
 
   useEffect(() => {
     orbitViewChangeRef.current = onOrbitViewChange;
   }, [onOrbitViewChange]);
+
+  useEffect(() => {
+    sceneReadyRef.current = onSceneReady;
+  }, [onSceneReady]);
 
   useEffect(() => {
     if (highlightRequestId <= 0) {
@@ -582,16 +590,16 @@ export default function CubeMapScene({
 
     const overview = buildCubeMapOverview();
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(cubeSceneTheme.background);
+    scene.background = null;
     scene.fog = new THREE.FogExp2(cubeSceneTheme.background, cubeSceneTheme.fog.density);
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
-      alpha: false,
+      alpha: true,
       powerPreference: "high-performance",
       preserveDrawingBuffer: true,
     });
-    renderer.setClearColor(cubeSceneTheme.background, 1);
+    renderer.setClearColor(cubeSceneTheme.background, 0);
     renderer.autoClear = false;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -786,6 +794,11 @@ export default function CubeMapScene({
           emissiveMap: emissiveMask,
           emissiveColor: shaderTheme.emissiveColor,
           emissiveStrength: shaderTheme.emissiveStrength,
+          frontViewFadeStrength: 0,
+          frontViewFadePower: cubeSceneTheme.orbitView.frontViewFade.power,
+          frontViewAlphaMultiplier: cubeSceneTheme.orbitView.frontViewFade.alphaMultiplier,
+          frontViewSaturationMultiplier:
+            cubeSceneTheme.orbitView.frontViewFade.saturationMultiplier,
           opacity: cubeSceneTheme.cube.opacity,
         });
         const mesh = new THREE.Mesh(nodeGeometry, material) as CubeMesh;
@@ -813,6 +826,7 @@ export default function CubeMapScene({
           baseOpacity: cubeSceneTheme.cube.opacity,
           targetOpacity: cubeSceneTheme.cube.opacity,
           targetOpacityMapMix: 0,
+          targetFrontViewFadeStrength: 0,
           maskOccluder,
         };
         nodesGroup.add(mesh);
@@ -850,6 +864,8 @@ export default function CubeMapScene({
       position: THREE.Vector3;
       target: THREE.Vector3;
     } | null = null;
+    let orbitAutoRotateResumeAt: number | null = null;
+    let isOrbitControlsInteractionActive = false;
     container.dataset.cubeViewMode = "map";
 
     const isSearchHighlightActive = () => Boolean(selectedMesh && viewMode === "map");
@@ -858,7 +874,59 @@ export default function CubeMapScene({
       orbitViewChangeRef.current?.(viewMode === "orbit");
     };
 
+    const stopOrbitAutoRotate = () => {
+      orbitAutoRotateResumeAt = null;
+      isOrbitControlsInteractionActive = false;
+      controls.autoRotate = false;
+      delete container.dataset.orbitAutoRotate;
+    };
+
+    const startOrbitAutoRotate = () => {
+      if (viewMode !== "orbit" || !cubeSceneTheme.orbitView.autoRotate.enabled) {
+        stopOrbitAutoRotate();
+        return;
+      }
+
+      orbitAutoRotateResumeAt = null;
+      controls.autoRotateSpeed = cubeSceneTheme.orbitView.autoRotate.speed;
+      controls.autoRotate = true;
+      container.dataset.orbitAutoRotate = "active";
+    };
+
+    const pauseOrbitAutoRotate = () => {
+      if (viewMode !== "orbit" || !cubeSceneTheme.orbitView.autoRotate.enabled) {
+        stopOrbitAutoRotate();
+        return;
+      }
+
+      orbitAutoRotateResumeAt = null;
+      controls.autoRotate = false;
+      container.dataset.orbitAutoRotate = "paused";
+    };
+
+    const scheduleOrbitAutoRotateResume = () => {
+      if (viewMode !== "orbit" || !cubeSceneTheme.orbitView.autoRotate.enabled) {
+        stopOrbitAutoRotate();
+        return;
+      }
+
+      controls.autoRotate = false;
+      orbitAutoRotateResumeAt = performance.now() + cubeSceneTheme.orbitView.autoRotate.resumeDelayMs;
+      container.dataset.orbitAutoRotate = "paused";
+    };
+
+    const updateOrbitAutoRotate = (frameTime: number) => {
+      if (viewMode !== "orbit" || orbitAutoRotateResumeAt === null) {
+        return;
+      }
+
+      if (frameTime >= orbitAutoRotateResumeAt) {
+        startOrbitAutoRotate();
+      }
+    };
+
     const applyMapControls = () => {
+      stopOrbitAutoRotate();
       controls.minDistance = cubeSceneTheme.camera.minDistance;
       controls.maxDistance = cubeSceneTheme.camera.maxDistance;
       controls.enablePan = true;
@@ -952,6 +1020,7 @@ export default function CubeMapScene({
         mesh.userData.targetScale = 1;
         mesh.userData.targetOpacity = mesh.userData.baseOpacity;
         mesh.userData.targetOpacityMapMix = 0;
+        mesh.userData.targetFrontViewFadeStrength = 0;
       });
     };
 
@@ -1042,6 +1111,7 @@ export default function CubeMapScene({
         mesh.userData.targetOpacity =
           mesh === selectedMesh ? cubeSceneTheme.hover.highlightOpacity : SEARCH_DIMMED_OPACITY;
         mesh.userData.targetOpacityMapMix = 0;
+        mesh.userData.targetFrontViewFadeStrength = 0;
       });
     };
 
@@ -1058,6 +1128,8 @@ export default function CubeMapScene({
         mesh.userData.targetScale = mesh === focusedMesh ? cubeSceneTheme.orbitView.focusedScale : 0;
         mesh.userData.targetOpacity = mesh === focusedMesh ? cubeSceneTheme.hover.highlightOpacity : 0;
         mesh.userData.targetOpacityMapMix = mesh === focusedMesh ? 1 : 0;
+        mesh.userData.targetFrontViewFadeStrength =
+          mesh === focusedMesh ? cubeSceneTheme.orbitView.frontViewFade.strength : 0;
       });
     };
 
@@ -1118,6 +1190,7 @@ export default function CubeMapScene({
       focusedMesh = selectedMesh;
       hovered = null;
       outlineSource = selectedMesh;
+      isOrbitControlsInteractionActive = false;
       savedMapCameraState = {
         position: camera.position.clone(),
         target: controls.target.clone(),
@@ -1129,6 +1202,7 @@ export default function CubeMapScene({
       container.dataset.focusedCubeKey = selectedMesh.userData.key;
       container.style.cursor = "grab";
       applyOrbitControls();
+      startOrbitAutoRotate();
       applyOrbitViewTargets();
       createStoryThumbnailCube();
       notifyOrbitViewChange();
@@ -1140,6 +1214,7 @@ export default function CubeMapScene({
       }
 
       viewMode = "map";
+      stopOrbitAutoRotate();
       disposeStoryThumbnailCube();
       focusedMesh = null;
       delete container.dataset.focusedCubeKey;
@@ -1226,6 +1301,7 @@ export default function CubeMapScene({
 
         storyThumbnailTextures = storyTextures;
         createCubeMeshes(geometry, opacityMask, orbitOpacityMask, emissiveMask);
+        sceneReadyRef.current?.();
 
         if (pendingHighlightRequestIdRef.current > 0) {
           pendingHighlightRequestIdRef.current = 0;
@@ -1312,12 +1388,29 @@ export default function CubeMapScene({
     };
 
     const handleControlsStart = () => {
+      if (viewMode === "orbit") {
+        isOrbitControlsInteractionActive = true;
+        pauseOrbitAutoRotate();
+        return;
+      }
+
+      isOrbitControlsInteractionActive = false;
+
       if (viewMode === "map" && searchHighlightZoom) {
         cancelSearchHighlightZoom(true);
       }
     };
 
     const handleControlsEnd = () => {
+      if (viewMode === "orbit") {
+        if (isOrbitControlsInteractionActive) {
+          scheduleOrbitAutoRotateResume();
+        }
+
+        isOrbitControlsInteractionActive = false;
+        return;
+      }
+
       if (viewMode !== "map" || !selectedMesh || searchHighlightZoom) {
         return;
       }
@@ -1418,6 +1511,7 @@ export default function CubeMapScene({
       animationFrame = requestAnimationFrame(render);
       const frameTime = performance.now();
       updateSearchHighlightZoom(frameTime);
+      updateOrbitAutoRotate(frameTime);
       controls.update();
 
       if (viewMode === "orbit") {
@@ -1464,6 +1558,14 @@ export default function CubeMapScene({
             material.uniforms.uOpacityMapMix.value,
             mesh.userData.targetOpacityMapMix,
             cubeSceneTheme.orbitView.opacityMaskTransitionLerp,
+          );
+        }
+
+        if (material.uniforms.uFrontViewFadeStrength) {
+          material.uniforms.uFrontViewFadeStrength.value = lerpValue(
+            material.uniforms.uFrontViewFadeStrength.value,
+            mesh.userData.targetFrontViewFadeStrength,
+            cubeSceneTheme.orbitView.frontViewFade.transitionLerp,
           );
         }
 
@@ -1525,7 +1627,7 @@ export default function CubeMapScene({
       }
 
       renderer.setRenderTarget(null);
-      renderer.setClearColor(cubeSceneTheme.background, 1);
+      renderer.setClearColor(cubeSceneTheme.background, 0);
       renderer.clear(true, true, true);
       renderer.render(scene, camera);
 
