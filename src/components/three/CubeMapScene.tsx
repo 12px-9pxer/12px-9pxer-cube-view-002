@@ -1107,7 +1107,10 @@ export default function CubeMapScene({
       outlineSource = selectedMesh;
       cubeMeshes.forEach((mesh) => {
         mesh.userData.targetPosition.copy(mesh.userData.basePosition);
-        mesh.userData.targetScale = 1;
+        mesh.userData.targetScale =
+          mesh === selectedMesh && hovered === selectedMesh
+            ? cubeSceneTheme.hover.searchHighlightHoverScale
+            : 1;
         mesh.userData.targetOpacity =
           mesh === selectedMesh ? cubeSceneTheme.hover.highlightOpacity : SEARCH_DIMMED_OPACITY;
         mesh.userData.targetOpacityMapMix = 0;

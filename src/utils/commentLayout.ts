@@ -11,6 +11,14 @@ export const COMMENT_CARD_HEIGHT = 120;
 const COLLISION_GAP = 18;
 const SAFE_MARGIN = 18;
 const TOP_SAFE_MARGIN = 112;
+const STAGE_SAFE_MARGIN = 16;
+const COMMENT_INPUT_HEIGHT = 76;
+const COMMENT_INPUT_DESKTOP_LEFT_OFFSET = 27;
+const COMMENT_INPUT_DESKTOP_BOTTOM_GAP = 28;
+const COMMENT_INPUT_MOBILE_BOTTOM_GAP = 16;
+const REACTION_BAR_MOBILE_BOTTOM_GAP = 108;
+const INITIAL_COMMENT_STACK_GAP = 14;
+const MOBILE_COMMENT_LAYOUT_BREAKPOINT = 900;
 
 function getViewportBounds() {
   if (typeof window === "undefined") {
@@ -43,6 +51,29 @@ const COMMENT_SLOTS: CommentPosition[] = [
   { x: 81, y: 386 },
   { x: 982, y: 728 },
 ];
+
+export function getInitialCommentStackPositions(count: number) {
+  const viewport = getViewportBounds();
+  const isMobile = viewport.width <= MOBILE_COMMENT_LAYOUT_BREAKPOINT;
+  const safeBottom = viewport.height - STAGE_SAFE_MARGIN;
+  const inputLeft = isMobile ? STAGE_SAFE_MARGIN : STAGE_SAFE_MARGIN + COMMENT_INPUT_DESKTOP_LEFT_OFFSET;
+  const inputTop =
+    safeBottom -
+    COMMENT_INPUT_HEIGHT -
+    (isMobile ? COMMENT_INPUT_MOBILE_BOTTOM_GAP : COMMENT_INPUT_DESKTOP_BOTTOM_GAP);
+  const stackAnchorTop = isMobile
+    ? safeBottom - COMMENT_INPUT_HEIGHT - REACTION_BAR_MOBILE_BOTTOM_GAP
+    : inputTop;
+
+  return Array.from({ length: count }, (_, index) => ({
+    x: inputLeft,
+    y:
+      stackAnchorTop -
+      INITIAL_COMMENT_STACK_GAP -
+      COMMENT_CARD_HEIGHT -
+      (count - index - 1) * (COMMENT_CARD_HEIGHT + INITIAL_COMMENT_STACK_GAP),
+  }));
+}
 
 export function clampCommentPosition(position: CommentPosition): CommentPosition {
   const viewport = getViewportBounds();

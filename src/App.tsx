@@ -23,6 +23,7 @@ import {
 import {
   getNextCommentPosition,
   clampCommentPosition,
+  getInitialCommentStackPositions,
   resolveCommentCollisions,
   resolveNonOverlappingPosition,
   type CommentPosition,
@@ -84,14 +85,16 @@ export default function App() {
   const [selectedPollOption, setSelectedPollOption] = useState<PollOptionId | null>(null);
   const [isPollSubmitted, setIsPollSubmitted] = useState(false);
   const [isPollCardDismissed, setIsPollCardDismissed] = useState(false);
-  const [comments, setComments] = useState<CommentItem[]>(() =>
-    resolveCommentCollisions(
-      initialComments.map((comment) => ({
+  const [comments, setComments] = useState<CommentItem[]>(() => {
+    const initialCommentStackPositions = getInitialCommentStackPositions(2);
+
+    return resolveCommentCollisions(
+      initialComments.map((comment, index) => ({
         ...comment,
-        position: clampCommentPosition(comment.position),
+        position: clampCommentPosition(initialCommentStackPositions[index] ?? comment.position),
       })),
-    ),
-  );
+    );
+  });
   const screenRef = useRef<HTMLDivElement>(null);
   const activeScreenRef = useRef<ScreenId>(screen);
   const isTransitioningRef = useRef(false);
