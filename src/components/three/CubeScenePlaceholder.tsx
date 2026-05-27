@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
+import { MinimalCubeLoader } from "../ui/MinimalCubeLoader";
 
 const CubeMapScene = lazy(() => import("./CubeMapScene"));
 
@@ -8,21 +9,6 @@ type CubeScenePlaceholderProps = {
   exitOrbitViewRequestId?: number;
   onOrbitViewChange?: (isOrbitView: boolean) => void;
 };
-
-function CubeSceneLoader() {
-  return (
-    <div className="cube-scene-loader" data-name="cube-scene/loading-indicator" aria-hidden="true">
-      <div className="cube-scene-loader-icon">
-        <span />
-        <span />
-        <span />
-      </div>
-      <div className="cube-scene-loader-track">
-        <span />
-      </div>
-    </div>
-  );
-}
 
 export function CubeScenePlaceholder({
   enabled = true,
@@ -58,7 +44,9 @@ export function CubeScenePlaceholder({
           onSceneReady={() => setIsSceneReady(true)}
         />
       </Suspense>
-      {!isSceneReady ? <CubeSceneLoader /> : null}
+      {!isSceneReady ? (
+        <MinimalCubeLoader variant="scene" dataName="cube-scene/loading-indicator" />
+      ) : null}
     </>
   );
 }

@@ -1,8 +1,16 @@
 import { gsap } from "gsap";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { DetailScreen } from "./components/screens/DetailScreen";
 import { LandingScreen } from "./components/screens/LandingScreen";
 import { SearchScreen } from "./components/screens/SearchScreen";
+import { MinimalCubeLoader } from "./components/ui/MinimalCubeLoader";
 import { PrototypeStage } from "./components/ui/PrototypeStage";
 import { prototypeParams } from "./config/prototypeParams";
 import {
@@ -42,8 +50,37 @@ const screenBackgrounds: Record<
   },
 };
 
+type LoadingOverlayState = {
+  isMounted: boolean;
+  isVisible: boolean;
+};
+
+function wait(ms: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function preloadImage(src: string | null) {
+  if (!src) {
+    return Promise.resolve();
+  }
+
+  return new Promise<void>((resolve) => {
+    const image = new Image();
+
+    image.onload = () => resolve();
+    image.onerror = () => resolve();
+    image.src = src;
+  });
+}
+
 export default function App() {
   const [screen, setScreen] = useState<ScreenId>("landing");
+  const [loadingOverlay, setLoadingOverlay] = useState<LoadingOverlayState>({
+    isMounted: true,
+    isVisible: true,
+  });
   const [selectedPollOption, setSelectedPollOption] = useState<PollOptionId | null>(null);
   const [isPollSubmitted, setIsPollSubmitted] = useState(false);
   const [isPollCardDismissed, setIsPollCardDismissed] = useState(false);
@@ -58,9 +95,68 @@ export default function App() {
   const screenRef = useRef<HTMLDivElement>(null);
   const activeScreenRef = useRef<ScreenId>(screen);
   const isTransitioningRef = useRef(false);
+  const isLoadingOverlayActiveRef = useRef(true);
+  const loadingOverlayExitTimerRef = useRef<number | null>(null);
   const commentsRef = useRef(comments);
   const inertiaFrameRef = useRef<number | null>(null);
   const background = screenBackgrounds[screen];
+
+  const showLoadingOverlay = useCallback(() => {
+    if (loadingOverlayExitTimerRef.current !== null) {
+      window.clearTimeout(loadingOverlayExitTimerRef.current);
+      loadingOverlayExitTimerRef.current = null;
+    }
+
+    isLoadingOverlayActiveRef.current = true;
+    setLoadingOverlay({
+      isMounted: true,
+      isVisible: true,
+    });
+  }, []);
+
+  const hideLoadingOverlay = useCallback(() => {
+    const fadeDurationMs = prototypeParams.loading.overlayFadeDuration * 1000;
+
+    isLoadingOverlayActiveRef.current = false;
+    setLoadingOverlay((currentState) =>
+      currentState.isMounted
+        ? {
+            isMounted: true,
+            isVisible: false,
+          }
+        : currentState,
+    );
+
+    if (loadingOverlayExitTimerRef.current !== null) {
+      window.clearTimeout(loadingOverlayExitTimerRef.current);
+    }
+
+    loadingOverlayExitTimerRef.current = window.setTimeout(() => {
+      loadingOverlayExitTimerRef.current = null;
+      setLoadingOverlay((currentState) =>
+        currentState.isVisible
+          ? currentState
+          : {
+              isMounted: false,
+              isVisible: false,
+            },
+      );
+    }, fadeDurationMs);
+  }, []);
+
+  const runLoadingGate = useCallback(
+    async (imageSrc: string | null) => {
+      showLoadingOverlay();
+
+      await Promise.all([
+        preloadImage(imageSrc),
+        wait(prototypeParams.loading.minimumDurationMs),
+      ]);
+
+      hideLoadingOverlay();
+    },
+    [hideLoadingOverlay, showLoadingOverlay],
+  );
 
   useEffect(() => {
     commentsRef.current = comments;
@@ -88,9 +184,34 @@ export default function App() {
   }, [screen]);
 
   useEffect(() => {
+    let isCancelled = false;
+
+    const runInitialLoading = async () => {
+      await Promise.all([
+        preloadImage(prototypeAssets.landingBg),
+        wait(prototypeParams.loading.minimumDurationMs),
+      ]);
+
+      if (!isCancelled) {
+        hideLoadingOverlay();
+      }
+    };
+
+    void runInitialLoading();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [hideLoadingOverlay]);
+
+  useEffect(() => {
     return () => {
       if (inertiaFrameRef.current !== null) {
         window.cancelAnimationFrame(inertiaFrameRef.current);
+      }
+
+      if (loadingOverlayExitTimerRef.current !== null) {
+        window.clearTimeout(loadingOverlayExitTimerRef.current);
       }
 
       if (screenRef.current) {
@@ -294,8 +415,12 @@ export default function App() {
   const goToScreen = useCallback((nextScreen: ScreenId) => {
     const currentScreen = activeScreenRef.current;
 
-    if (nextScreen === currentScreen || isTransitioningRef.current) {
-      return;
+    if (
+      nextScreen === currentScreen ||
+      isTransitioningRef.current ||
+      isLoadingOverlayActiveRef.current
+    ) {
+      return false;
     }
 
     const screenElement = screenRef.current;
@@ -303,7 +428,7 @@ export default function App() {
     if (!screenElement) {
       activeScreenRef.current = nextScreen;
       setScreen(nextScreen);
-      return;
+      return true;
     }
 
     const { transitions } = prototypeParams;
@@ -323,7 +448,22 @@ export default function App() {
         setScreen(nextScreen);
       },
     });
+
+    return true;
   }, []);
+
+  const goToDetailWithLoading = useCallback(async () => {
+    if (
+      activeScreenRef.current === "detail" ||
+      isTransitioningRef.current ||
+      isLoadingOverlayActiveRef.current
+    ) {
+      return;
+    }
+
+    await runLoadingGate(prototypeAssets.detailBg);
+    goToScreen("detail");
+  }, [goToScreen, runLoadingGate]);
 
   return (
     <PrototypeStage
@@ -337,7 +477,7 @@ export default function App() {
         ) : null}
 
         {screen === "search" ? (
-          <SearchScreen onOpenStoryDetail={() => goToScreen("detail")} />
+          <SearchScreen onOpenStoryDetail={goToDetailWithLoading} />
         ) : null}
 
         {screen === "detail" ? (
@@ -357,6 +497,19 @@ export default function App() {
           />
         ) : null}
       </div>
+
+      {loadingOverlay.isMounted ? (
+        <MinimalCubeLoader
+          variant="fullscreen"
+          isExiting={!loadingOverlay.isVisible}
+          dataName="app/global-loading-indicator"
+          style={
+            {
+              "--minimal-cube-loader-fade-duration": `${prototypeParams.loading.overlayFadeDuration}s`,
+            } as CSSProperties
+          }
+        />
+      ) : null}
     </PrototypeStage>
   );
 }

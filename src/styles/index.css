@@ -111,60 +111,69 @@ button {
   touch-action: none;
 }
 
-.cube-scene-loader {
+.minimal-cube-loader {
   position: absolute;
   inset: 0;
-  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 14px;
+}
+
+.minimal-cube-loader--scene {
+  z-index: 2;
   pointer-events: none;
   background: #f7f6f6;
   background: linear-gradient(180deg, rgb(247 246 246) 0%, rgb(214 214 214) 100%);
 }
 
-.cube-scene-loader-icon {
-  position: relative;
-  width: 30px;
-  height: 30px;
-  transform: rotateX(58deg) rotateZ(45deg);
-  animation: cube-scene-loader-float 1.35s ease-in-out infinite;
+.minimal-cube-loader--fullscreen {
+  z-index: 80;
+  pointer-events: auto;
+  background: #f7f6f6;
+  background: linear-gradient(180deg, rgb(247 246 246) 0%, rgb(214 214 214) 100%);
+  opacity: 1;
+  transition: opacity var(--minimal-cube-loader-fade-duration, 180ms) ease;
 }
 
-.cube-scene-loader-icon span {
-  position: absolute;
+.minimal-cube-loader--exiting {
+  opacity: 0;
+}
+
+.minimal-cube-loader__icon {
+  width: 32px;
+  height: 32px;
+  color: rgb(44 44 45);
+  filter: drop-shadow(0 4px 10px rgb(44 44 45 / 10%));
+  animation: minimal-cube-loader-float 1.35s ease-in-out infinite;
+}
+
+.minimal-cube-loader__symbol {
   display: block;
-  background: rgb(44 44 45 / 78%);
-  border: 1px solid rgb(255 255 255 / 50%);
+  width: 32px;
+  height: 32px;
+  font-family: "Material Symbols Outlined";
+  font-size: 32px;
+  font-style: normal;
+  font-weight: normal;
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 32;
+  letter-spacing: normal;
+  line-height: 1;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  color: currentColor;
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
 }
 
-.cube-scene-loader-icon span:nth-child(1) {
-  inset: 7px 7px 7px 7px;
-}
-
-.cube-scene-loader-icon span:nth-child(2) {
-  left: 15px;
-  top: 7px;
-  width: 8px;
-  height: 16px;
-  transform: skewY(-35deg);
-  transform-origin: left center;
-  opacity: 0.66;
-}
-
-.cube-scene-loader-icon span:nth-child(3) {
-  left: 7px;
-  top: 15px;
-  width: 16px;
-  height: 8px;
-  transform: skewX(-35deg);
-  transform-origin: center top;
-  opacity: 0.5;
-}
-
-.cube-scene-loader-track {
+.minimal-cube-loader__track {
   width: 88px;
   height: 3px;
   overflow: hidden;
@@ -172,16 +181,16 @@ button {
   background: rgb(44 44 45 / 14%);
 }
 
-.cube-scene-loader-track span {
+.minimal-cube-loader__track span {
   display: block;
   width: 38%;
   height: 100%;
   border-radius: inherit;
   background: rgb(44 44 45 / 76%);
-  animation: cube-scene-loader-bar 1.05s ease-in-out infinite;
+  animation: minimal-cube-loader-bar 1.05s ease-in-out infinite;
 }
 
-@keyframes cube-scene-loader-bar {
+@keyframes minimal-cube-loader-bar {
   0% {
     transform: translateX(-110%);
   }
@@ -191,14 +200,14 @@ button {
   }
 }
 
-@keyframes cube-scene-loader-float {
+@keyframes minimal-cube-loader-float {
   0%,
   100% {
-    transform: translateY(0) rotateX(58deg) rotateZ(45deg);
+    transform: translateY(0);
   }
 
   50% {
-    transform: translateY(-3px) rotateX(58deg) rotateZ(45deg);
+    transform: translateY(-3px);
   }
 }
 

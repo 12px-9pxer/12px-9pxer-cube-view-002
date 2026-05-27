@@ -39,6 +39,10 @@ const colors = {
 } as const;
 
 export const prototypeParams = {
+  loading: {
+    minimumDurationMs: 500,
+    overlayFadeDuration: 0.18,
+  },
   transitions: {
     /** 화면이 새로 들어올 때 걸리는 시간입니다. 초 단위입니다. */
     pageTransitionEnterDuration: 0.46,
