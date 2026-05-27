@@ -72,6 +72,12 @@ export const prototypeText = {
   logoLabel: "User Story",
   landingButton: "GO",
   currentView: "Cube View",
+  orbitTitle: "워킹맘",
+  orbitStats: [
+    { id: "views", icon: "visibility", label: "2.4천회" },
+    { id: "comments", icon: "comment", label: "36개" },
+    { id: "reactions", icon: "share_windows", label: "800회" },
+  ],
   searchPlaceholder: "검색어 입력",
   searchTags: ["Ai 활용 기능", "워킹맘"],
   storyTitle: "육아 전쟁의 시작",

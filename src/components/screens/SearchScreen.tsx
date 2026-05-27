@@ -9,6 +9,18 @@ type SearchScreenProps = {
   onOpenStoryDetail: () => void;
 };
 
+function getOrbitStatWidthClass(id: string) {
+  if (id === "comments") {
+    return "w-[64px]";
+  }
+
+  if (id === "reactions") {
+    return "w-[69px]";
+  }
+
+  return "w-[79px]";
+}
+
 export function SearchScreen({ onOpenStoryDetail }: SearchScreenProps) {
   const [query, setQuery] = useState("");
   const [highlightRequestId, setHighlightRequestId] = useState(0);
@@ -37,6 +49,42 @@ export function SearchScreen({ onOpenStoryDetail }: SearchScreenProps) {
 
       {isOrbitView ? (
         <>
+          <header
+            className="pointer-events-none absolute left-[var(--viewport-center-x)] top-[max(calc(var(--safe-top)+96px),calc(var(--viewport-center-y)-720px))] z-20 flex h-[102px] w-[242px] -translate-x-1/2 flex-col items-center text-white"
+            data-name="header/orbit-story-summary"
+            aria-label={prototypeText.orbitTitle}
+          >
+            <div
+              className="flex h-[48px] w-[145px] items-center justify-center rounded-full bg-[#d0d0d0] text-[32px] font-bold leading-[1.5] tracking-[-0.32px] text-[#333333]"
+              data-name="header/orbit-story-title-pill"
+            >
+              {prototypeText.orbitTitle}
+            </div>
+
+            <div
+              className="mt-[30px] flex h-[24px] w-[242px] items-center gap-[15px]"
+              data-name="header/orbit-story-stats"
+            >
+              {prototypeText.orbitStats.map((stat) => (
+                <div
+                  key={stat.id}
+                  className={`flex h-[24px] items-center gap-[6px] ${getOrbitStatWidthClass(stat.id)}`}
+                  data-name={`header/orbit-stat-${stat.id}`}
+                >
+                  <span
+                    className="material-symbols-outlined orbit-stat-symbol"
+                    aria-hidden="true"
+                  >
+                    {stat.icon}
+                  </span>
+                  <span className="whitespace-nowrap text-center text-[16px] font-semibold leading-[1.5] tracking-[-0.16px] text-black/80">
+                    {stat.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </header>
+
           <AnimatedButton
             type="button"
             onClick={() => setExitOrbitViewRequestId((requestId) => requestId + 1)}
