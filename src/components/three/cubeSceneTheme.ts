@@ -1,3 +1,51 @@
+export const cubeOrbitParallaxConfig = {
+  // Default HeadTrack state when entering Single Cube Orbit View.
+  defaultEnabled: false,
+  // Use pointer input only after secure-context camera/model startup failures.
+  fallbackToPointer: true,
+  // Face tracking parameters aligned with the parallax-effect three.js example.
+  tracking: {
+    scoreThreshold: 0.85,
+    smoothEye: 0.8,
+    smoothDistance: 0.1,
+    defaultDistance: 0.12,
+    horizontalYawWeight: 0.35,
+  },
+  // Clamp normalized head input before it reaches the camera adapter.
+  inputClamp: {
+    x: [-1, 1],
+    y: [-1, 1],
+    z: [0.65, 1.45],
+  },
+  // Single tuning surface for HeadTrack camera response.
+  camera: {
+    // Scale horizontal/vertical head angles only. Distance z stays raw.
+    headInputScale: {
+      x: 2,
+      y: 2,
+    },
+    // Flip axes if real-device movement feels reversed.
+    invertX: false,
+    invertY: false,
+    // Horizontal head input rotates the camera around controls.target.
+    yawScale: 0.35,
+    // Extra temporary yaw applied to the focused cube for visible horizontal response.
+    visualYawScale: 0.45,
+    // Vertical and distance offsets in scene world units.
+    positionScale: {
+      y: 55,
+      z: 70,
+    },
+    // Distance input also affects camera field of view.
+    fovScale: 0.08,
+    // Response smoothing for active tracking input.
+    lerp: 0.18,
+  },
+  // Smoothing used when returning to the neutral view.
+  neutralReturnLerp: 0.12,
+  // Delay before returning to neutral when no face is detected.
+  noFaceHoldMs: 400,
+} as const;
 export const cubeSceneTheme = {
   background: "#d6d6d6",
   rendering: {
@@ -45,35 +93,7 @@ export const cubeSceneTheme = {
       resumeDelayMs: 1500,
     },
     parallax: {
-      defaultEnabled: false,
-      fallbackToPointer: true,
-      tracking: {
-        scoreThreshold: 0.85,
-        smoothEye: 0.72,
-        smoothDistance: 0.18,
-        defaultDistance: 0.12,
-      },
-      inputClamp: {
-        x: [-1, 1],
-        y: [-1, 1],
-        z: [0.65, 1.45],
-      },
-      camera: {
-        strength: 1,
-        positionScale: {
-          x: 80,
-          y: 55,
-          z: 70,
-        },
-        rotationScale: {
-          x: 0.075,
-          y: 0.095,
-        },
-        fovScale: 0.08,
-        lerp: 0.18,
-      },
-      neutralReturnLerp: 0.12,
-      noFaceHoldMs: 700,
+      ...cubeOrbitParallaxConfig,
     },
     frontViewFade: {
       strength: 1.0,

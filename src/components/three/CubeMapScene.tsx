@@ -878,19 +878,24 @@ export default function CubeMapScene({
     const searchZoomOffset = new THREE.Vector3();
     const parallaxBasePosition = new THREE.Vector3();
     const parallaxBaseQuaternion = new THREE.Quaternion();
-    const parallaxRight = new THREE.Vector3();
+    const parallaxBaseFocusedQuaternion = new THREE.Quaternion();
+    const parallaxOrbitOffset = new THREE.Vector3();
     const parallaxUp = new THREE.Vector3();
     const parallaxForward = new THREE.Vector3();
+    const parallaxLookTarget = new THREE.Vector3();
+    const parallaxWorldUp = new THREE.Vector3(0, 1, 0);
     const neutralParallaxView: ParallaxViewInput = { x: 0, y: 0, z: 1 };
     let parallaxController: ParallaxInputController | null = null;
     let parallaxTargetView: ParallaxViewInput = { ...neutralParallaxView };
     let parallaxCurrentView: ParallaxViewInput = { ...neutralParallaxView };
     let parallaxBaseFov = camera.fov;
+    let parallaxVisualYawMesh: CubeMesh | null = null;
     let parallaxStartToken = 0;
     let parallaxAbortController: AbortController | null = null;
     let isParallaxStarting = false;
     let isParallaxInputFailed = false;
     let isParallaxCameraApplied = false;
+    let isParallaxVisualYawApplied = false;
     let selectedMesh: CubeMesh | null = null;
     let hovered: CubeMesh | null = null;
     let outlineSource: CubeMesh | null = null;
@@ -1002,6 +1007,15 @@ export default function CubeMapScene({
         z: Number(view.z.toFixed(3)),
       });
 
+    const formatParallaxAppliedInput = (view: ParallaxViewInput, yaw: number, visualYaw: number) =>
+      JSON.stringify({
+        x: Number(view.x.toFixed(3)),
+        y: Number(view.y.toFixed(3)),
+        z: Number(view.z.toFixed(3)),
+        yaw: Number(yaw.toFixed(3)),
+        visualYaw: Number(visualYaw.toFixed(3)),
+      });
+
     const setParallaxStatus = (status: ParallaxTrackingStatus) => {
       container.dataset.parallaxFaceDetected =
         status.faceDetected === null ? "n/a" : String(status.faceDetected);
@@ -1011,6 +1025,7 @@ export default function CubeMapScene({
     const clearParallaxStatus = () => {
       delete container.dataset.parallaxFaceDetected;
       delete container.dataset.parallaxInput;
+      delete container.dataset.parallaxApplied;
     };
 
     const resetParallaxView = () => {
@@ -1127,33 +1142,66 @@ export default function CubeMapScene({
       }
 
       const { camera: parallaxCamera } = cubeSceneTheme.orbitView.parallax;
-      const strength = parallaxCamera.strength;
-      const view = parallaxCurrentView;
+      const headInputScale = parallaxCamera.headInputScale ?? { x: 1, y: 1 };
+      const view = {
+        x: parallaxCurrentView.x * headInputScale.x * (parallaxCamera.invertX ? -1 : 1),
+        y: parallaxCurrentView.y * headInputScale.y * (parallaxCamera.invertY ? -1 : 1),
+        z: parallaxCurrentView.z,
+      };
 
       parallaxBasePosition.copy(camera.position);
       parallaxBaseQuaternion.copy(camera.quaternion);
       parallaxBaseFov = camera.fov;
 
-      parallaxRight.set(1, 0, 0).applyQuaternion(parallaxBaseQuaternion).normalize();
-      parallaxUp.set(0, 1, 0).applyQuaternion(parallaxBaseQuaternion).normalize();
-      parallaxForward.subVectors(controls.target, parallaxBasePosition).normalize();
+      const yawAngle = view.x * (parallaxCamera.yawScale ?? 0);
+      const visualYawAngle = view.x * (parallaxCamera.visualYawScale ?? 0);
+      container.dataset.parallaxApplied = formatParallaxAppliedInput(
+        view,
+        yawAngle,
+        visualYawAngle,
+      );
+
+      parallaxUp
+        .set(0, 1, 0)
+        .applyQuaternion(parallaxBaseQuaternion)
+        .applyAxisAngle(parallaxWorldUp, yawAngle)
+        .normalize();
+      parallaxLookTarget.copy(controls.target);
+      parallaxOrbitOffset
+        .subVectors(parallaxBasePosition, parallaxLookTarget)
+        .applyAxisAngle(parallaxWorldUp, yawAngle);
 
       camera.position
-        .addScaledVector(parallaxRight, view.x * parallaxCamera.positionScale.x * strength)
-        .addScaledVector(parallaxUp, view.y * parallaxCamera.positionScale.y * strength)
-        .addScaledVector(
-          parallaxForward,
-          (1 - view.z) * parallaxCamera.positionScale.z * strength,
-        );
-      camera.quaternion.copy(parallaxBaseQuaternion);
-      camera.rotateX((-parallaxCamera.rotationScale.x * view.y * strength) / camera.aspect / 1.5);
-      camera.rotateY(parallaxCamera.rotationScale.y * view.x * strength);
+        .copy(parallaxLookTarget)
+        .add(parallaxOrbitOffset)
+        .addScaledVector(parallaxUp, view.y * parallaxCamera.positionScale.y);
+      parallaxForward.subVectors(parallaxLookTarget, camera.position).normalize();
+      camera.position.addScaledVector(
+        parallaxForward,
+        (1 - view.z) * parallaxCamera.positionScale.z,
+      );
+      camera.lookAt(parallaxLookTarget);
       camera.fov = parallaxBaseFov / (1 + parallaxCamera.fovScale - parallaxCamera.fovScale * view.z);
       camera.updateProjectionMatrix();
       isParallaxCameraApplied = true;
+
+      if (focusedMesh && Math.abs(visualYawAngle) > 0.0001) {
+        parallaxVisualYawMesh = focusedMesh;
+        parallaxBaseFocusedQuaternion.copy(focusedMesh.quaternion);
+        focusedMesh.rotation.y += visualYawAngle;
+        focusedMesh.updateMatrixWorld(true);
+        isParallaxVisualYawApplied = true;
+      }
     };
 
     const restoreParallaxCamera = () => {
+      if (isParallaxVisualYawApplied && parallaxVisualYawMesh) {
+        parallaxVisualYawMesh.quaternion.copy(parallaxBaseFocusedQuaternion);
+        parallaxVisualYawMesh.updateMatrixWorld(true);
+        parallaxVisualYawMesh = null;
+        isParallaxVisualYawApplied = false;
+      }
+
       if (!isParallaxCameraApplied) {
         return;
       }

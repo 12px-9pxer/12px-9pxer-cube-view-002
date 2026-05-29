@@ -33,6 +33,7 @@ export type ParallaxTrackingConfig = {
     smoothEye: number;
     smoothDistance: number;
     defaultDistance: number;
+    horizontalYawWeight: number;
   };
   inputClamp: {
     x: readonly [number, number];
@@ -67,28 +68,57 @@ function clampView(view: ParallaxViewInput, config: ParallaxTrackingConfig) {
   };
 }
 
-function getLandmarkPair(face: NormalizedFace) {
+function getPoint(value: unknown) {
+  if (!Array.isArray(value) || value.length < 2) {
+    return null;
+  }
+
+  const [x, y] = value;
+
+  if (typeof x !== "number" || typeof y !== "number") {
+    return null;
+  }
+
+  return [x, y] as const;
+}
+
+function getFaceBoxCenter(face: NormalizedFace) {
+  const faceWithBox = face as NormalizedFace & {
+    topLeft?: unknown;
+    bottomRight?: unknown;
+  };
+  const topLeft = getPoint(faceWithBox.topLeft);
+  const bottomRight = getPoint(faceWithBox.bottomRight);
+
+  if (!topLeft || !bottomRight) {
+    return null;
+  }
+
+  return {
+    x: (topLeft[0] + bottomRight[0]) / 2,
+    y: (topLeft[1] + bottomRight[1]) / 2,
+  };
+}
+
+function getFaceLandmarks(face: NormalizedFace) {
   const landmarks = face.landmarks;
 
   if (!Array.isArray(landmarks) || landmarks.length < 2) {
     return null;
   }
 
-  const firstEye = landmarks[0];
-  const secondEye = landmarks[1];
+  const firstEye = getPoint(landmarks[0]);
+  const secondEye = getPoint(landmarks[1]);
+  const nose = getPoint(landmarks[2]);
 
-  if (
-    !Array.isArray(firstEye) ||
-    !Array.isArray(secondEye) ||
-    firstEye.length < 2 ||
-    secondEye.length < 2
-  ) {
+  if (!firstEye || !secondEye) {
     return null;
   }
 
   return {
     firstEye,
     secondEye,
+    nose,
   };
 }
 
@@ -316,16 +346,16 @@ async function createFaceParallaxTracker({
       }
 
       const face = faces[0];
-      const eyePair = face ? getLandmarkPair(face) : null;
+      const faceLandmarks = face ? getFaceLandmarks(face) : null;
       const width = Math.max(1, video.videoWidth);
       const height = Math.max(1, video.videoHeight);
 
-      if (eyePair) {
+      if (faceLandmarks) {
         const nextEyes: [number, number, number, number] = [
-          eyePair.firstEye[0],
-          eyePair.firstEye[1],
-          eyePair.secondEye[0],
-          eyePair.secondEye[1],
+          faceLandmarks.firstEye[0],
+          faceLandmarks.firstEye[1],
+          faceLandmarks.secondEye[0],
+          faceLandmarks.secondEye[1],
         ];
 
         if (!smoothedEyes) {
@@ -351,10 +381,19 @@ async function createFaceParallaxTracker({
               nextDistance * config.tracking.smoothDistance;
         lastFaceAt = performance.now();
 
+        const eyeCenterX = (smoothedEyes[0] + smoothedEyes[2]) / 2;
+        const eyeCenterY = (smoothedEyes[1] + smoothedEyes[3]) / 2;
+        const faceBoxCenter = getFaceBoxCenter(face);
+        const horizontalCenterX = faceBoxCenter?.x ?? eyeCenterX;
+        const noseOffsetX = faceLandmarks.nose
+          ? ((faceLandmarks.nose[0] - eyeCenterX) / Math.max(1, eyeDistance)) *
+            config.tracking.horizontalYawWeight
+          : 0;
+
         const view = clampView(
           {
-            x: (smoothedEyes[0] + smoothedEyes[2]) / width - 1,
-            y: 1 - (smoothedEyes[1] + smoothedEyes[3]) / height,
+            x: (horizontalCenterX / width) * 2 - 1 + noseOffsetX,
+            y: 1 - (eyeCenterY / height) * 2,
             z: config.tracking.defaultDistance / Math.max(0.0001, smoothedDistance),
           },
           config,
