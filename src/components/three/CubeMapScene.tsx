@@ -15,6 +15,7 @@ import {
   createParallaxInputController,
   ParallaxUnavailableError,
   type ParallaxInputController,
+  type ParallaxTrackingStatus,
   type ParallaxUnavailableReason,
   type ParallaxViewInput,
 } from "./parallaxTracking";
@@ -920,6 +921,8 @@ export default function CubeMapScene({
       orbitViewChangeRef.current?.(viewMode === "orbit");
     };
 
+    const isHeadTrackEnabled = () => viewMode === "orbit" && parallaxViewEnabledRef.current;
+
     const stopOrbitAutoRotate = () => {
       orbitAutoRotateResumeAt = null;
       isOrbitControlsInteractionActive = false;
@@ -928,7 +931,11 @@ export default function CubeMapScene({
     };
 
     const startOrbitAutoRotate = () => {
-      if (viewMode !== "orbit" || !cubeSceneTheme.orbitView.autoRotate.enabled) {
+      if (
+        viewMode !== "orbit" ||
+        !cubeSceneTheme.orbitView.autoRotate.enabled ||
+        isHeadTrackEnabled()
+      ) {
         stopOrbitAutoRotate();
         return;
       }
@@ -940,7 +947,11 @@ export default function CubeMapScene({
     };
 
     const pauseOrbitAutoRotate = () => {
-      if (viewMode !== "orbit" || !cubeSceneTheme.orbitView.autoRotate.enabled) {
+      if (
+        viewMode !== "orbit" ||
+        !cubeSceneTheme.orbitView.autoRotate.enabled ||
+        isHeadTrackEnabled()
+      ) {
         stopOrbitAutoRotate();
         return;
       }
@@ -951,7 +962,11 @@ export default function CubeMapScene({
     };
 
     const scheduleOrbitAutoRotateResume = () => {
-      if (viewMode !== "orbit" || !cubeSceneTheme.orbitView.autoRotate.enabled) {
+      if (
+        viewMode !== "orbit" ||
+        !cubeSceneTheme.orbitView.autoRotate.enabled ||
+        isHeadTrackEnabled()
+      ) {
         stopOrbitAutoRotate();
         return;
       }
@@ -962,6 +977,11 @@ export default function CubeMapScene({
     };
 
     const updateOrbitAutoRotate = (frameTime: number) => {
+      if (isHeadTrackEnabled()) {
+        stopOrbitAutoRotate();
+        return;
+      }
+
       if (viewMode !== "orbit" || orbitAutoRotateResumeAt === null) {
         return;
       }
@@ -973,6 +993,24 @@ export default function CubeMapScene({
 
     const setParallaxTargetView = (view: ParallaxViewInput) => {
       parallaxTargetView = view;
+    };
+
+    const formatParallaxInput = (view: ParallaxViewInput) =>
+      JSON.stringify({
+        x: Number(view.x.toFixed(3)),
+        y: Number(view.y.toFixed(3)),
+        z: Number(view.z.toFixed(3)),
+      });
+
+    const setParallaxStatus = (status: ParallaxTrackingStatus) => {
+      container.dataset.parallaxFaceDetected =
+        status.faceDetected === null ? "n/a" : String(status.faceDetected);
+      container.dataset.parallaxInput = formatParallaxInput(status.input);
+    };
+
+    const clearParallaxStatus = () => {
+      delete container.dataset.parallaxFaceDetected;
+      delete container.dataset.parallaxInput;
     };
 
     const resetParallaxView = () => {
@@ -990,6 +1028,7 @@ export default function CubeMapScene({
       parallaxController = null;
       resetParallaxView();
       delete container.dataset.parallaxView;
+      clearParallaxStatus();
     };
 
     const startParallaxInput = () => {
@@ -997,15 +1036,18 @@ export default function CubeMapScene({
         return;
       }
 
+      stopOrbitAutoRotate();
       isParallaxStarting = true;
       const startToken = ++parallaxStartToken;
       parallaxAbortController = new AbortController();
       container.dataset.parallaxView = "starting";
+      container.dataset.parallaxInput = formatParallaxInput(neutralParallaxView);
 
       createParallaxInputController({
         target: renderer.domElement,
         config: cubeSceneTheme.orbitView.parallax,
         onView: setParallaxTargetView,
+        onStatus: setParallaxStatus,
         signal: parallaxAbortController.signal,
       })
         .then((controller) => {
@@ -1022,6 +1064,7 @@ export default function CubeMapScene({
           isParallaxStarting = false;
           parallaxController = controller;
           container.dataset.parallaxView = controller.mode;
+          stopOrbitAutoRotate();
         })
         .catch((error) => {
           if (startToken !== parallaxStartToken) {
@@ -1033,6 +1076,7 @@ export default function CubeMapScene({
           parallaxAbortController = null;
           container.dataset.parallaxView = "failed";
           resetParallaxView();
+          clearParallaxStatus();
 
           if (error instanceof ParallaxUnavailableError) {
             parallaxViewUnavailableRef.current?.(error.reason);
@@ -1045,12 +1089,19 @@ export default function CubeMapScene({
 
     const syncParallaxInput = () => {
       if (viewMode === "orbit" && parallaxViewEnabledRef.current) {
+        if (controls.autoRotate || orbitAutoRotateResumeAt !== null) {
+          stopOrbitAutoRotate();
+        }
         startParallaxInput();
         return;
       }
 
       if (parallaxController || isParallaxStarting || isParallaxInputFailed) {
         stopParallaxInput();
+
+        if (viewMode === "orbit") {
+          startOrbitAutoRotate();
+        }
       }
     };
 

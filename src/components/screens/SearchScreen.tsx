@@ -114,9 +114,9 @@ export function SearchScreen({ onOpenStoryDetail }: SearchScreenProps) {
             onClick={() => setIsParallaxViewEnabled((isEnabled) => !isEnabled)}
             className="absolute left-[calc(var(--safe-right)-86px)] top-[calc(var(--safe-top)+32px)] z-20 flex h-[54px] w-[54px] items-center justify-center rounded-full bg-[#2c2c2d] text-white backdrop-blur-[18.29px]"
             data-name="button/orbit-parallax-toggle"
-            aria-label={isParallaxViewEnabled ? "Disable Parallax View" : "Enable Parallax View"}
+            aria-label={isParallaxViewEnabled ? "Disable HeadTrack" : "Enable HeadTrack"}
             aria-pressed={isParallaxViewEnabled}
-            title={isParallaxViewEnabled ? "Disable Parallax View" : "Enable Parallax View"}
+            title={isParallaxViewEnabled ? "Disable HeadTrack" : "Enable HeadTrack"}
           >
             <span
               className="material-symbols-outlined orbit-parallax-toggle-symbol"

@@ -6,6 +6,14 @@ export type ParallaxViewInput = {
   z: number;
 };
 
+export type ParallaxTrackingMode = "face" | "pointer";
+
+export type ParallaxTrackingStatus = {
+  mode: ParallaxTrackingMode;
+  faceDetected: boolean | null;
+  input: ParallaxViewInput;
+};
+
 export type ParallaxUnavailableReason = "insecure-context" | "media-unavailable";
 
 export class ParallaxUnavailableError extends Error {
@@ -35,7 +43,7 @@ export type ParallaxTrackingConfig = {
 };
 
 export type ParallaxInputController = {
-  mode: "face" | "pointer";
+  mode: ParallaxTrackingMode;
   stop: () => void;
 };
 
@@ -43,6 +51,7 @@ type CreateParallaxInputControllerOptions = {
   target: HTMLElement;
   config: ParallaxTrackingConfig;
   onView: (view: ParallaxViewInput) => void;
+  onStatus?: (status: ParallaxTrackingStatus) => void;
   signal?: AbortSignal;
 };
 
@@ -87,6 +96,7 @@ function installPointerParallaxFallback({
   target,
   config,
   onView,
+  onStatus,
   signal,
 }: CreateParallaxInputControllerOptions): ParallaxInputController {
   if (signal?.aborted) {
@@ -105,20 +115,22 @@ function installPointerParallaxFallback({
     const width = Math.max(1, rect.width);
     const height = Math.max(1, rect.height);
 
-    onView(
-      clampView(
-        {
-          x: ((event.clientX - rect.left) / width) * 2 - 1,
-          y: 1 - ((event.clientY - rect.top) / height) * 2,
-          z: 1,
-        },
-        config,
-      ),
+    const view = clampView(
+      {
+        x: ((event.clientX - rect.left) / width) * 2 - 1,
+        y: 1 - ((event.clientY - rect.top) / height) * 2,
+        z: 1,
+      },
+      config,
     );
+
+    onView(view);
+    onStatus?.({ mode: "pointer", faceDetected: null, input: view });
   };
 
   const handlePointerLeave = () => {
     onView({ x: 0, y: 0, z: 1 });
+    onStatus?.({ mode: "pointer", faceDetected: null, input: { x: 0, y: 0, z: 1 } });
   };
 
   const controller: ParallaxInputController = {
@@ -131,6 +143,7 @@ function installPointerParallaxFallback({
         signal?.removeEventListener("abort", abortHandler);
       }
       onView({ x: 0, y: 0, z: 1 });
+      onStatus?.({ mode: "pointer", faceDetected: null, input: { x: 0, y: 0, z: 1 } });
     },
   };
 
@@ -139,6 +152,7 @@ function installPointerParallaxFallback({
   abortHandler = () => controller.stop();
   signal?.addEventListener("abort", abortHandler, { once: true });
   onView({ x: 0, y: 0, z: 1 });
+  onStatus?.({ mode: "pointer", faceDetected: null, input: { x: 0, y: 0, z: 1 } });
 
   return controller;
 }
@@ -191,6 +205,7 @@ async function createFaceParallaxTracker({
   target,
   config,
   onView,
+  onStatus,
   signal,
 }: CreateParallaxInputControllerOptions): Promise<ParallaxInputController> {
   if (!window.isSecureContext) {
@@ -240,6 +255,7 @@ async function createFaceParallaxTracker({
     video.srcObject = null;
     signal?.removeEventListener("abort", stop);
     onView({ x: 0, y: 0, z: 1 });
+    onStatus?.({ mode: "face", faceDetected: false, input: { x: 0, y: 0, z: 1 } });
   };
 
   signal?.addEventListener("abort", stop, { once: true });
@@ -335,18 +351,22 @@ async function createFaceParallaxTracker({
               nextDistance * config.tracking.smoothDistance;
         lastFaceAt = performance.now();
 
-        onView(
-          clampView(
-            {
-              x: (smoothedEyes[0] + smoothedEyes[2]) / width - 1,
-              y: 1 - (smoothedEyes[1] + smoothedEyes[3]) / height,
-              z: config.tracking.defaultDistance / Math.max(0.0001, smoothedDistance),
-            },
-            config,
-          ),
+        const view = clampView(
+          {
+            x: (smoothedEyes[0] + smoothedEyes[2]) / width - 1,
+            y: 1 - (smoothedEyes[1] + smoothedEyes[3]) / height,
+            z: config.tracking.defaultDistance / Math.max(0.0001, smoothedDistance),
+          },
+          config,
         );
+
+        onView(view);
+        onStatus?.({ mode: "face", faceDetected: true, input: view });
       } else if (performance.now() - lastFaceAt > config.noFaceHoldMs) {
-        onView({ x: 0, y: 0, z: 1 });
+        const view = { x: 0, y: 0, z: 1 };
+
+        onView(view);
+        onStatus?.({ mode: "face", faceDetected: false, input: view });
       }
     } catch (error) {
       console.warn("Face parallax tracking failed.", error);

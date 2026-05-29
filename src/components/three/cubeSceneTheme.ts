@@ -61,18 +61,18 @@ export const cubeSceneTheme = {
       camera: {
         strength: 1,
         positionScale: {
-          x: 28,
-          y: 18,
-          z: 28,
+          x: 80,
+          y: 55,
+          z: 70,
         },
         rotationScale: {
-          x: 0.035,
-          y: 0.05,
+          x: 0.075,
+          y: 0.095,
         },
-        fovScale: 0.04,
-        lerp: 0.12,
+        fovScale: 0.08,
+        lerp: 0.18,
       },
-      neutralReturnLerp: 0.08,
+      neutralReturnLerp: 0.12,
       noFaceHoldMs: 700,
     },
     frontViewFade: {
