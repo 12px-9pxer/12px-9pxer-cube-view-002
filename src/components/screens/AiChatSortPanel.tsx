@@ -84,7 +84,7 @@ function ChatBubble({ message }: { message: AiChatMessage }) {
       <div
         className={
           isAi
-            ? "flex min-w-[150px] max-w-full items-start justify-center gap-[4px] rounded-br-[24px] rounded-tl-[24px] rounded-tr-[24px] border border-[rgba(212,212,212,0.9)] bg-[rgba(219,219,219,0.9)] px-[20px] py-[16px] backdrop-blur-[20px]"
+            ? "flex min-w-[150px] max-w-full items-center justify-start gap-[4px] rounded-br-[24px] rounded-tl-[24px] rounded-tr-[24px] border border-[rgba(212,212,212,0.9)] bg-[rgba(219,219,219,0.9)] px-[20px] py-[16px] backdrop-blur-[20px]"
             : "flex w-fit max-w-full flex-col items-center rounded-bl-[24px] rounded-tl-[24px] rounded-tr-[24px] border border-[rgba(255,255,255,0.9)] bg-[rgba(255,255,255,0.8)] px-[20px] py-[16px] backdrop-blur-[50px]"
         }
         data-name={isAi ? "chat bubble_ai" : "chat bubble"}
@@ -94,7 +94,7 @@ function ChatBubble({ message }: { message: AiChatMessage }) {
           <ThinkingDotsAnimation />
         ) : (
           <p
-            className={`w-full break-words text-[16px] font-medium leading-[1.5] tracking-[-0.16px] ${
+            className={`flex min-h-[24px] w-full items-center break-words text-[16px] font-medium leading-[1.5] tracking-[-0.16px] ${
               isAi ? "min-w-px flex-1 text-[#1c1c1c]" : "text-[#2c2c2d]"
             }`}
           >

@@ -39,17 +39,17 @@ export const headTrackConfig = {
     },
     // Raise x for stronger left/right response. Raise y for stronger up/down response.
     headInputScale: {
-      x: 1.0,
+      x: 2.0,
       y: 2.5,
     },
     // Flip axes if real-device movement feels reversed.
     invertX: false,
     invertY: false,
     // Raise yawScale for stronger horizontal orbit around the cube.
-    yawScale: 0.46,
+    yawScale: 0.86,
     // Raise y for more top/bottom reveal. Raise z for stronger forward/back distance.
     positionScale: {
-      y: 55,
+      y: 120,
       z: 70,
     },
   },
@@ -57,9 +57,9 @@ export const headTrackConfig = {
     // Raise fovScale for stronger depth/zoom feel from forward/back movement.
     fovScale: 0.08,
     // Lower responseMs follows faster. Higher responseMs feels smoother.
-    responseMs: 55,
+    responseMs: 25,
     // Lower neutralReturnMs snaps back faster when tracking returns to center.
-    neutralReturnMs: 120,
+    neutralReturnMs: 100,
   },
 } as const;
 
