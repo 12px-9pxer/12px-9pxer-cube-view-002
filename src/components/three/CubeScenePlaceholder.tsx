@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
+import type { ParallaxUnavailableReason } from "./parallaxTracking";
 import { MinimalCubeLoader } from "../ui/MinimalCubeLoader";
 
 const CubeMapScene = lazy(() => import("./CubeMapScene"));
@@ -7,14 +8,18 @@ type CubeScenePlaceholderProps = {
   enabled?: boolean;
   highlightRequestId?: number;
   exitOrbitViewRequestId?: number;
+  parallaxViewEnabled?: boolean;
   onOrbitViewChange?: (isOrbitView: boolean) => void;
+  onParallaxViewUnavailable?: (reason: ParallaxUnavailableReason) => void;
 };
 
 export function CubeScenePlaceholder({
   enabled = true,
   highlightRequestId = 0,
   exitOrbitViewRequestId = 0,
+  parallaxViewEnabled = false,
   onOrbitViewChange,
+  onParallaxViewUnavailable,
 }: CubeScenePlaceholderProps) {
   const [isSceneReady, setIsSceneReady] = useState(false);
 
@@ -40,7 +45,9 @@ export function CubeScenePlaceholder({
         <CubeMapScene
           highlightRequestId={highlightRequestId}
           exitOrbitViewRequestId={exitOrbitViewRequestId}
+          parallaxViewEnabled={parallaxViewEnabled}
           onOrbitViewChange={onOrbitViewChange}
+          onParallaxViewUnavailable={onParallaxViewUnavailable}
           onSceneReady={() => setIsSceneReady(true)}
         />
       </Suspense>

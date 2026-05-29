@@ -198,6 +198,30 @@ button {
   -webkit-font-smoothing: antialiased;
 }
 
+.orbit-parallax-toggle-symbol {
+  display: block;
+  width: 24px;
+  height: 24px;
+  font-family: "Material Symbols Outlined";
+  font-size: 24px;
+  font-style: normal;
+  font-weight: normal;
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
+  letter-spacing: normal;
+  line-height: 1;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  color: currentColor;
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+}
+
 .minimal-cube-loader__track {
   width: 88px;
   height: 3px;

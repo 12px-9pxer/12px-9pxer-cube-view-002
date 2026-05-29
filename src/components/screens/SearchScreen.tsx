@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { prototypeAssets, prototypeText } from "../../data/prototypeContent";
 import { CubeScenePlaceholder } from "../three/CubeScenePlaceholder";
+import { cubeSceneTheme } from "../three/cubeSceneTheme";
 import { AnimatedButton } from "../ui/AnimatedButton";
 import { ArrowGlyph } from "../ui/ArrowGlyph";
 import { GlassIconButton } from "../ui/GlassIconButton";
@@ -26,6 +27,15 @@ export function SearchScreen({ onOpenStoryDetail }: SearchScreenProps) {
   const [highlightRequestId, setHighlightRequestId] = useState(0);
   const [exitOrbitViewRequestId, setExitOrbitViewRequestId] = useState(0);
   const [isOrbitView, setIsOrbitView] = useState(false);
+  const [isParallaxViewEnabled, setIsParallaxViewEnabled] = useState<boolean>(
+    () => cubeSceneTheme.orbitView.parallax.defaultEnabled,
+  );
+
+  useEffect(() => {
+    if (!isOrbitView) {
+      setIsParallaxViewEnabled(cubeSceneTheme.orbitView.parallax.defaultEnabled);
+    }
+  }, [isOrbitView]);
 
   const submitSearch = () => {
     if (!query.trim()) {
@@ -44,7 +54,9 @@ export function SearchScreen({ onOpenStoryDetail }: SearchScreenProps) {
       <CubeScenePlaceholder
         highlightRequestId={highlightRequestId}
         exitOrbitViewRequestId={exitOrbitViewRequestId}
+        parallaxViewEnabled={isOrbitView && isParallaxViewEnabled}
         onOrbitViewChange={setIsOrbitView}
+        onParallaxViewUnavailable={() => setIsParallaxViewEnabled(false)}
       />
 
       {isOrbitView ? (
@@ -95,6 +107,23 @@ export function SearchScreen({ onOpenStoryDetail }: SearchScreenProps) {
           >
             <ArrowGlyph className="rotate-180" />
             <span>Back</span>
+          </AnimatedButton>
+
+          <AnimatedButton
+            type="button"
+            onClick={() => setIsParallaxViewEnabled((isEnabled) => !isEnabled)}
+            className="absolute left-[calc(var(--safe-right)-86px)] top-[calc(var(--safe-top)+32px)] z-20 flex h-[54px] w-[54px] items-center justify-center rounded-full bg-[#2c2c2d] text-white backdrop-blur-[18.29px]"
+            data-name="button/orbit-parallax-toggle"
+            aria-label={isParallaxViewEnabled ? "Disable Parallax View" : "Enable Parallax View"}
+            aria-pressed={isParallaxViewEnabled}
+            title={isParallaxViewEnabled ? "Disable Parallax View" : "Enable Parallax View"}
+          >
+            <span
+              className="material-symbols-outlined orbit-parallax-toggle-symbol"
+              aria-hidden="true"
+            >
+              {isParallaxViewEnabled ? "visibility" : "visibility_off"}
+            </span>
           </AnimatedButton>
 
           <AnimatedButton

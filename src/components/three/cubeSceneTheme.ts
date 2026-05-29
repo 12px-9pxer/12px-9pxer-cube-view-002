@@ -44,6 +44,37 @@ export const cubeSceneTheme = {
       speed: 0.55,
       resumeDelayMs: 1500,
     },
+    parallax: {
+      defaultEnabled: false,
+      fallbackToPointer: true,
+      tracking: {
+        scoreThreshold: 0.85,
+        smoothEye: 0.72,
+        smoothDistance: 0.18,
+        defaultDistance: 0.12,
+      },
+      inputClamp: {
+        x: [-1, 1],
+        y: [-1, 1],
+        z: [0.65, 1.45],
+      },
+      camera: {
+        strength: 1,
+        positionScale: {
+          x: 28,
+          y: 18,
+          z: 28,
+        },
+        rotationScale: {
+          x: 0.035,
+          y: 0.05,
+        },
+        fovScale: 0.04,
+        lerp: 0.12,
+      },
+      neutralReturnLerp: 0.08,
+      noFaceHoldMs: 700,
+    },
     frontViewFade: {
       strength: 1.0,
       power: 2.4,

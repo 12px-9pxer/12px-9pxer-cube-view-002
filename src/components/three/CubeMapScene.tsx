@@ -11,6 +11,13 @@ import {
 } from "./cubeMapData";
 import { cubeSceneTheme } from "./cubeSceneTheme";
 import { createCookTorranceMaterial } from "./createCookTorranceMaterial";
+import {
+  createParallaxInputController,
+  ParallaxUnavailableError,
+  type ParallaxInputController,
+  type ParallaxUnavailableReason,
+  type ParallaxViewInput,
+} from "./parallaxTracking";
 
 const SIZE = (CUBE_MAP_STEPS - 1) * CUBE_MAP_UNIT;
 const GRAPH_CENTER = new THREE.Vector3(SIZE / 2, SIZE / 2, SIZE / 2);
@@ -535,7 +542,9 @@ function createMaskOutlineMaterial(maskTexture: THREE.Texture) {
 type CubeMapSceneProps = {
   highlightRequestId?: number;
   exitOrbitViewRequestId?: number;
+  parallaxViewEnabled?: boolean;
   onOrbitViewChange?: (isOrbitView: boolean) => void;
+  onParallaxViewUnavailable?: (reason: ParallaxUnavailableReason) => void;
   onSceneReady?: () => void;
 };
 
@@ -544,14 +553,18 @@ type CubeViewMode = "map" | "orbit";
 export default function CubeMapScene({
   highlightRequestId = 0,
   exitOrbitViewRequestId = 0,
+  parallaxViewEnabled = false,
   onOrbitViewChange,
+  onParallaxViewUnavailable,
   onSceneReady,
 }: CubeMapSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const searchHighlightHandlerRef = useRef<(() => void) | null>(null);
   const exitOrbitViewHandlerRef = useRef<(() => void) | null>(null);
   const orbitViewChangeRef = useRef(onOrbitViewChange);
+  const parallaxViewUnavailableRef = useRef(onParallaxViewUnavailable);
   const sceneReadyRef = useRef(onSceneReady);
+  const parallaxViewEnabledRef = useRef(parallaxViewEnabled);
   const pendingHighlightRequestIdRef = useRef(0);
 
   useEffect(() => {
@@ -561,6 +574,14 @@ export default function CubeMapScene({
   useEffect(() => {
     sceneReadyRef.current = onSceneReady;
   }, [onSceneReady]);
+
+  useEffect(() => {
+    parallaxViewUnavailableRef.current = onParallaxViewUnavailable;
+  }, [onParallaxViewUnavailable]);
+
+  useEffect(() => {
+    parallaxViewEnabledRef.current = parallaxViewEnabled;
+  }, [parallaxViewEnabled]);
 
   useEffect(() => {
     if (highlightRequestId <= 0) {
@@ -854,6 +875,21 @@ export default function CubeMapScene({
     const orbitCameraOffset = new THREE.Vector3();
     const searchZoomTarget = new THREE.Vector3();
     const searchZoomOffset = new THREE.Vector3();
+    const parallaxBasePosition = new THREE.Vector3();
+    const parallaxBaseQuaternion = new THREE.Quaternion();
+    const parallaxRight = new THREE.Vector3();
+    const parallaxUp = new THREE.Vector3();
+    const parallaxForward = new THREE.Vector3();
+    const neutralParallaxView: ParallaxViewInput = { x: 0, y: 0, z: 1 };
+    let parallaxController: ParallaxInputController | null = null;
+    let parallaxTargetView: ParallaxViewInput = { ...neutralParallaxView };
+    let parallaxCurrentView: ParallaxViewInput = { ...neutralParallaxView };
+    let parallaxBaseFov = camera.fov;
+    let parallaxStartToken = 0;
+    let parallaxAbortController: AbortController | null = null;
+    let isParallaxStarting = false;
+    let isParallaxInputFailed = false;
+    let isParallaxCameraApplied = false;
     let selectedMesh: CubeMesh | null = null;
     let hovered: CubeMesh | null = null;
     let outlineSource: CubeMesh | null = null;
@@ -933,6 +969,149 @@ export default function CubeMapScene({
       if (frameTime >= orbitAutoRotateResumeAt) {
         startOrbitAutoRotate();
       }
+    };
+
+    const setParallaxTargetView = (view: ParallaxViewInput) => {
+      parallaxTargetView = view;
+    };
+
+    const resetParallaxView = () => {
+      parallaxTargetView = { ...neutralParallaxView };
+      parallaxCurrentView = { ...neutralParallaxView };
+    };
+
+    const stopParallaxInput = () => {
+      parallaxStartToken += 1;
+      isParallaxStarting = false;
+      isParallaxInputFailed = false;
+      parallaxAbortController?.abort();
+      parallaxAbortController = null;
+      parallaxController?.stop();
+      parallaxController = null;
+      resetParallaxView();
+      delete container.dataset.parallaxView;
+    };
+
+    const startParallaxInput = () => {
+      if (parallaxController || isParallaxStarting || isParallaxInputFailed) {
+        return;
+      }
+
+      isParallaxStarting = true;
+      const startToken = ++parallaxStartToken;
+      parallaxAbortController = new AbortController();
+      container.dataset.parallaxView = "starting";
+
+      createParallaxInputController({
+        target: renderer.domElement,
+        config: cubeSceneTheme.orbitView.parallax,
+        onView: setParallaxTargetView,
+        signal: parallaxAbortController.signal,
+      })
+        .then((controller) => {
+          if (
+            disposed ||
+            startToken !== parallaxStartToken ||
+            viewMode !== "orbit" ||
+            !parallaxViewEnabledRef.current
+          ) {
+            controller.stop();
+            return;
+          }
+
+          isParallaxStarting = false;
+          parallaxController = controller;
+          container.dataset.parallaxView = controller.mode;
+        })
+        .catch((error) => {
+          if (startToken !== parallaxStartToken) {
+            return;
+          }
+
+          isParallaxStarting = false;
+          isParallaxInputFailed = true;
+          parallaxAbortController = null;
+          container.dataset.parallaxView = "failed";
+          resetParallaxView();
+
+          if (error instanceof ParallaxUnavailableError) {
+            parallaxViewUnavailableRef.current?.(error.reason);
+            return;
+          }
+
+          console.warn("Failed to start parallax input.", error);
+        });
+    };
+
+    const syncParallaxInput = () => {
+      if (viewMode === "orbit" && parallaxViewEnabledRef.current) {
+        startParallaxInput();
+        return;
+      }
+
+      if (parallaxController || isParallaxStarting || isParallaxInputFailed) {
+        stopParallaxInput();
+      }
+    };
+
+    const updateParallaxView = () => {
+      const isReturningToNeutral =
+        Math.abs(parallaxTargetView.x) < 0.0001 &&
+        Math.abs(parallaxTargetView.y) < 0.0001 &&
+        Math.abs(parallaxTargetView.z - 1) < 0.0001;
+      const lerpAmount = isReturningToNeutral
+        ? cubeSceneTheme.orbitView.parallax.neutralReturnLerp
+        : cubeSceneTheme.orbitView.parallax.camera.lerp;
+
+      parallaxCurrentView = {
+        x: lerpValue(parallaxCurrentView.x, parallaxTargetView.x, lerpAmount),
+        y: lerpValue(parallaxCurrentView.y, parallaxTargetView.y, lerpAmount),
+        z: lerpValue(parallaxCurrentView.z, parallaxTargetView.z, lerpAmount),
+      };
+    };
+
+    const applyParallaxCamera = () => {
+      if (viewMode !== "orbit" || !parallaxViewEnabledRef.current) {
+        return;
+      }
+
+      const { camera: parallaxCamera } = cubeSceneTheme.orbitView.parallax;
+      const strength = parallaxCamera.strength;
+      const view = parallaxCurrentView;
+
+      parallaxBasePosition.copy(camera.position);
+      parallaxBaseQuaternion.copy(camera.quaternion);
+      parallaxBaseFov = camera.fov;
+
+      parallaxRight.set(1, 0, 0).applyQuaternion(parallaxBaseQuaternion).normalize();
+      parallaxUp.set(0, 1, 0).applyQuaternion(parallaxBaseQuaternion).normalize();
+      parallaxForward.subVectors(controls.target, parallaxBasePosition).normalize();
+
+      camera.position
+        .addScaledVector(parallaxRight, view.x * parallaxCamera.positionScale.x * strength)
+        .addScaledVector(parallaxUp, view.y * parallaxCamera.positionScale.y * strength)
+        .addScaledVector(
+          parallaxForward,
+          (1 - view.z) * parallaxCamera.positionScale.z * strength,
+        );
+      camera.quaternion.copy(parallaxBaseQuaternion);
+      camera.rotateX((-parallaxCamera.rotationScale.x * view.y * strength) / camera.aspect / 1.5);
+      camera.rotateY(parallaxCamera.rotationScale.y * view.x * strength);
+      camera.fov = parallaxBaseFov / (1 + parallaxCamera.fovScale - parallaxCamera.fovScale * view.z);
+      camera.updateProjectionMatrix();
+      isParallaxCameraApplied = true;
+    };
+
+    const restoreParallaxCamera = () => {
+      if (!isParallaxCameraApplied) {
+        return;
+      }
+
+      camera.position.copy(parallaxBasePosition);
+      camera.quaternion.copy(parallaxBaseQuaternion);
+      camera.fov = parallaxBaseFov;
+      camera.updateProjectionMatrix();
+      isParallaxCameraApplied = false;
     };
 
     const applyMapControls = () => {
@@ -1249,6 +1428,7 @@ export default function CubeMapScene({
       }
 
       viewMode = "map";
+      stopParallaxInput();
       stopOrbitAutoRotate();
       disposeStoryThumbnailCube();
       focusedMesh = null;
@@ -1545,9 +1725,11 @@ export default function CubeMapScene({
 
       animationFrame = requestAnimationFrame(render);
       const frameTime = performance.now();
+      syncParallaxInput();
       updateSearchHighlightZoom(frameTime);
       updateOrbitAutoRotate(frameTime);
       controls.update();
+      updateParallaxView();
 
       if (viewMode === "orbit") {
         gridPlanes.forEach((gridPlane) => {
@@ -1640,6 +1822,8 @@ export default function CubeMapScene({
       if (maskMesh) {
         maskMesh.visible = shouldRenderOutlineMesh;
       }
+
+      applyParallaxCamera();
       renderer.setRenderTarget(maskRenderTarget);
       renderer.setClearColor(0x000000, 0);
       renderer.clear(true, true, true);
@@ -1691,6 +1875,8 @@ export default function CubeMapScene({
         outlineMaterial.uniforms.opacity.value = outlineOpacity;
         renderer.render(overlayScene, overlayCamera);
       }
+
+      restoreParallaxCamera();
     };
 
     render();
@@ -1711,6 +1897,7 @@ export default function CubeMapScene({
       if (viewMode === "orbit") {
         orbitViewChangeRef.current?.(false);
       }
+      stopParallaxInput();
       controls.dispose();
       disposeStoryThumbnailCube();
       disposeObject(scene);
