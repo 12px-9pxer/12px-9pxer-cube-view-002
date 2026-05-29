@@ -4,6 +4,8 @@ export type ParallaxViewInput = {
   x: number;
   y: number;
   z: number;
+  rawX?: number;
+  relativeX?: number;
 };
 
 export type ParallaxTrackingMode = "face" | "pointer";
@@ -12,6 +14,8 @@ export type ParallaxTrackingStatus = {
   mode: ParallaxTrackingMode;
   faceDetected: boolean | null;
   input: ParallaxViewInput;
+  inferenceMs?: number;
+  trackingFps?: number;
 };
 
 export type ParallaxUnavailableReason = "insecure-context" | "media-unavailable";
@@ -30,8 +34,15 @@ export type ParallaxTrackingConfig = {
   fallbackToPointer: boolean;
   tracking: {
     scoreThreshold: number;
-    smoothEye: number;
-    smoothDistance: number;
+    video: {
+      width: number;
+      height: number;
+      frameRate: number;
+    };
+    maxFps: number;
+    smoothEyeMs: number;
+    smoothDistanceMs: number;
+    smoothInputMs: number;
     defaultDistance: number;
     horizontalYawWeight: number;
   };
@@ -60,12 +71,30 @@ function clamp(value: number, [min, max]: readonly [number, number]) {
   return Math.min(max, Math.max(min, value));
 }
 
+function getTimeAlpha(responseMs: number, dtMs: number) {
+  if (!Number.isFinite(responseMs) || responseMs <= 0) {
+    return 1;
+  }
+
+  return 1 - Math.exp(-Math.max(0, dtMs) / responseMs);
+}
+
 function clampView(view: ParallaxViewInput, config: ParallaxTrackingConfig) {
-  return {
+  const clamped: ParallaxViewInput = {
     x: clamp(view.x, config.inputClamp.x),
     y: clamp(view.y, config.inputClamp.y),
     z: clamp(view.z, config.inputClamp.z),
   };
+
+  if (typeof view.rawX === "number") {
+    clamped.rawX = clamp(view.rawX, config.inputClamp.x);
+  }
+
+  if (typeof view.relativeX === "number") {
+    clamped.relativeX = clamp(view.relativeX, config.inputClamp.x);
+  }
+
+  return clamped;
 }
 
 function getPoint(value: unknown) {
@@ -97,6 +126,7 @@ function getFaceBoxCenter(face: NormalizedFace) {
   return {
     x: (topLeft[0] + bottomRight[0]) / 2,
     y: (topLeft[1] + bottomRight[1]) / 2,
+    width: Math.abs(bottomRight[0] - topLeft[0]),
   };
 }
 
@@ -145,9 +175,12 @@ function installPointerParallaxFallback({
     const width = Math.max(1, rect.width);
     const height = Math.max(1, rect.height);
 
+    const x = ((event.clientX - rect.left) / width) * 2 - 1;
     const view = clampView(
       {
-        x: ((event.clientX - rect.left) / width) * 2 - 1,
+        x,
+        rawX: x,
+        relativeX: x,
         y: 1 - ((event.clientY - rect.top) / height) * 2,
         z: 1,
       },
@@ -159,8 +192,12 @@ function installPointerParallaxFallback({
   };
 
   const handlePointerLeave = () => {
-    onView({ x: 0, y: 0, z: 1 });
-    onStatus?.({ mode: "pointer", faceDetected: null, input: { x: 0, y: 0, z: 1 } });
+    onView({ x: 0, y: 0, z: 1, rawX: 0, relativeX: 0 });
+    onStatus?.({
+      mode: "pointer",
+      faceDetected: null,
+      input: { x: 0, y: 0, z: 1, rawX: 0, relativeX: 0 },
+    });
   };
 
   const controller: ParallaxInputController = {
@@ -172,8 +209,12 @@ function installPointerParallaxFallback({
       if (abortHandler) {
         signal?.removeEventListener("abort", abortHandler);
       }
-      onView({ x: 0, y: 0, z: 1 });
-      onStatus?.({ mode: "pointer", faceDetected: null, input: { x: 0, y: 0, z: 1 } });
+      onView({ x: 0, y: 0, z: 1, rawX: 0, relativeX: 0 });
+      onStatus?.({
+        mode: "pointer",
+        faceDetected: null,
+        input: { x: 0, y: 0, z: 1, rawX: 0, relativeX: 0 },
+      });
     },
   };
 
@@ -181,8 +222,12 @@ function installPointerParallaxFallback({
   target.addEventListener("pointerleave", handlePointerLeave);
   abortHandler = () => controller.stop();
   signal?.addEventListener("abort", abortHandler, { once: true });
-  onView({ x: 0, y: 0, z: 1 });
-  onStatus?.({ mode: "pointer", faceDetected: null, input: { x: 0, y: 0, z: 1 } });
+  onView({ x: 0, y: 0, z: 1, rawX: 0, relativeX: 0 });
+  onStatus?.({
+    mode: "pointer",
+    faceDetected: null,
+    input: { x: 0, y: 0, z: 1, rawX: 0, relativeX: 0 },
+  });
 
   return controller;
 }
@@ -257,11 +302,17 @@ async function createFaceParallaxTracker({
   }
 
   let stopped = false;
-  let animationFrame: number | null = null;
+  let tickTimeout: number | null = null;
   let stream: MediaStream | null = null;
   let model: BlazeFaceModel | null = null;
   let smoothedEyes: [number, number, number, number] | null = null;
   let smoothedDistance: number | null = null;
+  let smoothedView: ParallaxViewInput | null = null;
+  let neutralCenterX: number | null = null;
+  let neutralReferenceWidth: number | null = null;
+  let lastSampleAt: number | null = null;
+  let lastTrackingFpsAt: number | null = null;
+  let trackingFps = 0;
   let lastFaceAt = performance.now();
 
   const video = document.createElement("video");
@@ -272,9 +323,9 @@ async function createFaceParallaxTracker({
   const stop = () => {
     stopped = true;
 
-    if (animationFrame !== null) {
-      window.cancelAnimationFrame(animationFrame);
-      animationFrame = null;
+    if (tickTimeout !== null) {
+      window.clearTimeout(tickTimeout);
+      tickTimeout = null;
     }
 
     model?.dispose?.();
@@ -284,8 +335,12 @@ async function createFaceParallaxTracker({
     video.pause();
     video.srcObject = null;
     signal?.removeEventListener("abort", stop);
-    onView({ x: 0, y: 0, z: 1 });
-    onStatus?.({ mode: "face", faceDetected: false, input: { x: 0, y: 0, z: 1 } });
+    onView({ x: 0, y: 0, z: 1, rawX: 0, relativeX: 0 });
+    onStatus?.({
+      mode: "face",
+      faceDetected: false,
+      input: { x: 0, y: 0, z: 1, rawX: 0, relativeX: 0 },
+    });
   };
 
   signal?.addEventListener("abort", stop, { once: true });
@@ -295,6 +350,12 @@ async function createFaceParallaxTracker({
       audio: false,
       video: {
         facingMode: "user",
+        width: { ideal: config.tracking.video.width },
+        height: { ideal: config.tracking.video.height },
+        frameRate: {
+          ideal: config.tracking.video.frameRate,
+          max: config.tracking.video.frameRate,
+        },
       },
     });
 
@@ -333,17 +394,40 @@ async function createFaceParallaxTracker({
     throw error;
   }
 
+  const scheduleTick = (delayMs: number) => {
+    if (stopped || !model) {
+      return;
+    }
+
+    tickTimeout = window.setTimeout(() => {
+      tickTimeout = null;
+      void tick();
+    }, Math.max(0, delayMs));
+  };
+
   const tick = async () => {
     if (stopped || !model) {
       return;
     }
 
+    const tickStartedAt = performance.now();
+    let inferenceMs = 0;
+
     try {
+      const inferenceStartedAt = performance.now();
       const faces = await model.estimateFaces(video, false, true, true);
+      inferenceMs = performance.now() - inferenceStartedAt;
 
       if (stopped) {
         return;
       }
+
+      const sampleAt = performance.now();
+      const sampleDt = lastSampleAt === null ? 1000 / Math.max(1, config.tracking.maxFps) : sampleAt - lastSampleAt;
+      lastSampleAt = sampleAt;
+      trackingFps =
+        lastTrackingFpsAt === null ? 0 : 1000 / Math.max(1, sampleAt - lastTrackingFpsAt);
+      lastTrackingFpsAt = sampleAt;
 
       const face = faces[0];
       const faceLandmarks = face ? getFaceLandmarks(face) : null;
@@ -361,10 +445,10 @@ async function createFaceParallaxTracker({
         if (!smoothedEyes) {
           smoothedEyes = nextEyes;
         } else {
+          const eyeAlpha = getTimeAlpha(config.tracking.smoothEyeMs, sampleDt);
           for (let index = 0; index < smoothedEyes.length; index += 1) {
             smoothedEyes[index] =
-              smoothedEyes[index] * (1 - config.tracking.smoothEye) +
-              nextEyes[index] * config.tracking.smoothEye;
+              smoothedEyes[index] * (1 - eyeAlpha) + nextEyes[index] * eyeAlpha;
           }
         }
 
@@ -377,35 +461,80 @@ async function createFaceParallaxTracker({
         smoothedDistance =
           smoothedDistance === null
             ? nextDistance
-            : smoothedDistance * (1 - config.tracking.smoothDistance) +
-              nextDistance * config.tracking.smoothDistance;
+            : smoothedDistance * (1 - getTimeAlpha(config.tracking.smoothDistanceMs, sampleDt)) +
+              nextDistance * getTimeAlpha(config.tracking.smoothDistanceMs, sampleDt);
         lastFaceAt = performance.now();
 
         const eyeCenterX = (smoothedEyes[0] + smoothedEyes[2]) / 2;
         const eyeCenterY = (smoothedEyes[1] + smoothedEyes[3]) / 2;
         const faceBoxCenter = getFaceBoxCenter(face);
         const horizontalCenterX = faceBoxCenter?.x ?? eyeCenterX;
+        const referenceWidth = Math.max(1, faceBoxCenter?.width ?? eyeDistance);
+        if (neutralCenterX === null || neutralReferenceWidth === null) {
+          neutralCenterX = horizontalCenterX;
+          neutralReferenceWidth = referenceWidth;
+        }
+
         const noseOffsetX = faceLandmarks.nose
           ? ((faceLandmarks.nose[0] - eyeCenterX) / Math.max(1, eyeDistance)) *
             config.tracking.horizontalYawWeight
           : 0;
+        const rawX = (horizontalCenterX / width) * 2 - 1 + noseOffsetX;
+        const relativeX =
+          (horizontalCenterX - neutralCenterX) / Math.max(1, neutralReferenceWidth) + noseOffsetX;
 
-        const view = clampView(
+        const rawView = clampView(
           {
-            x: (horizontalCenterX / width) * 2 - 1 + noseOffsetX,
+            x: rawX,
+            rawX,
+            relativeX,
             y: 1 - (eyeCenterY / height) * 2,
             z: config.tracking.defaultDistance / Math.max(0.0001, smoothedDistance),
           },
           config,
         );
+        const inputAlpha = getTimeAlpha(config.tracking.smoothInputMs, sampleDt);
+        const view =
+          smoothedView === null
+            ? rawView
+            : clampView(
+                {
+                  x: smoothedView.x * (1 - inputAlpha) + rawView.x * inputAlpha,
+                  y: smoothedView.y * (1 - inputAlpha) + rawView.y * inputAlpha,
+                  z: smoothedView.z * (1 - inputAlpha) + rawView.z * inputAlpha,
+                  rawX:
+                    (smoothedView.rawX ?? smoothedView.x) * (1 - inputAlpha) +
+                    (rawView.rawX ?? rawView.x) * inputAlpha,
+                  relativeX:
+                    (smoothedView.relativeX ?? smoothedView.x) * (1 - inputAlpha) +
+                    (rawView.relativeX ?? rawView.x) * inputAlpha,
+                },
+                config,
+              );
+        smoothedView = view;
 
         onView(view);
-        onStatus?.({ mode: "face", faceDetected: true, input: view });
+        onStatus?.({
+          mode: "face",
+          faceDetected: true,
+          input: view,
+          inferenceMs,
+          trackingFps,
+        });
       } else if (performance.now() - lastFaceAt > config.noFaceHoldMs) {
-        const view = { x: 0, y: 0, z: 1 };
+        neutralCenterX = null;
+        neutralReferenceWidth = null;
+        smoothedView = null;
+        const view = { x: 0, y: 0, z: 1, rawX: 0, relativeX: 0 };
 
         onView(view);
-        onStatus?.({ mode: "face", faceDetected: false, input: view });
+        onStatus?.({
+          mode: "face",
+          faceDetected: false,
+          input: view,
+          inferenceMs,
+          trackingFps,
+        });
       }
     } catch (error) {
       console.warn("Face parallax tracking failed.", error);
@@ -413,10 +542,11 @@ async function createFaceParallaxTracker({
       return;
     }
 
-    animationFrame = window.requestAnimationFrame(tick);
+    const targetIntervalMs = 1000 / Math.max(1, config.tracking.maxFps);
+    scheduleTick(targetIntervalMs - (performance.now() - tickStartedAt));
   };
 
-  animationFrame = window.requestAnimationFrame(tick);
+  scheduleTick(0);
 
   return {
     mode: "face",

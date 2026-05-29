@@ -6,8 +6,18 @@ export const cubeOrbitParallaxConfig = {
   // Face tracking parameters aligned with the parallax-effect three.js example.
   tracking: {
     scoreThreshold: 0.85,
-    smoothEye: 0.8,
-    smoothDistance: 0.1,
+    // Keep webcam frames small so TFJS inference does not stall Three.js rendering.
+    video: {
+      width: 320,
+      height: 240,
+      frameRate: 24,
+    },
+    // Cap face inference independently from the Three.js render loop.
+    maxFps: 24,
+    // Time-based input smoothing. Lower values react faster, higher values smooth more.
+    smoothEyeMs: 45,
+    smoothDistanceMs: 120,
+    smoothInputMs: 70,
     defaultDistance: 0.12,
     horizontalYawWeight: 0.35,
   },
@@ -21,16 +31,14 @@ export const cubeOrbitParallaxConfig = {
   camera: {
     // Scale horizontal/vertical head angles only. Distance z stays raw.
     headInputScale: {
-      x: 2,
+      x: 2.6,
       y: 2,
     },
     // Flip axes if real-device movement feels reversed.
     invertX: false,
     invertY: false,
-    // Horizontal head input rotates the camera around controls.target.
-    yawScale: 0.35,
-    // Extra temporary yaw applied to the focused cube for visible horizontal response.
-    visualYawScale: 0.45,
+    // Relative horizontal head movement rotates the camera around controls.target.
+    yawScale: 0.46,
     // Vertical and distance offsets in scene world units.
     positionScale: {
       y: 55,
@@ -38,11 +46,11 @@ export const cubeOrbitParallaxConfig = {
     },
     // Distance input also affects camera field of view.
     fovScale: 0.08,
-    // Response smoothing for active tracking input.
-    lerp: 0.18,
+    // Time-based camera follow. Lower values feel faster.
+    responseMs: 55,
+    // Smoothing used when returning to the neutral view.
+    neutralReturnMs: 120,
   },
-  // Smoothing used when returning to the neutral view.
-  neutralReturnLerp: 0.12,
   // Delay before returning to neutral when no face is detected.
   noFaceHoldMs: 400,
 } as const;
