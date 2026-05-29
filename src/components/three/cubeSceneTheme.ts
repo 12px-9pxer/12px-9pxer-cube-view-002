@@ -1,58 +1,93 @@
-export const cubeOrbitParallaxConfig = {
-  // Default HeadTrack state when entering Single Cube Orbit View.
-  defaultEnabled: false,
-  // Use pointer input only after secure-context camera/model startup failures.
-  fallbackToPointer: true,
-  // Face tracking parameters aligned with the parallax-effect three.js example.
-  tracking: {
-    scoreThreshold: 0.85,
-    // Keep webcam frames small so TFJS inference does not stall Three.js rendering.
+// HeadTrack tuning surface. Adjust values here instead of touching scene code.
+export const headTrackConfig = {
+  enabled: {
+    // Default HeadTrack state when entering Single Cube Orbit View.
+    defaultOn: false,
+    // Use pointer input only after secure-context camera/model startup failures.
+    fallbackToPointer: true,
+  },
+  performance: {
+    // Lower resolution reduces TFJS inference cost and stutter on slower devices.
     video: {
       width: 320,
       height: 240,
       frameRate: 24,
     },
-    // Cap face inference independently from the Three.js render loop.
+    // Lower maxFps reduces GPU/CPU load. Higher maxFps updates tracking more often.
     maxFps: 24,
-    // Time-based input smoothing. Lower values react faster, higher values smooth more.
+  },
+  tracking: {
+    // Higher scoreThreshold is stricter but may drop faces more often.
+    scoreThreshold: 0.85,
+    // Lower smoothing ms reacts faster. Higher smoothing ms reduces jitter.
     smoothEyeMs: 45,
     smoothDistanceMs: 120,
     smoothInputMs: 70,
+    // Baseline face distance used to normalize forward/back movement.
     defaultDistance: 0.12,
+    // Adds a small nose/eye offset signal for head yaw. Raise carefully to avoid jitter.
     horizontalYawWeight: 0.35,
+    // Delay before returning to neutral when no face is detected.
+    noFaceHoldMs: 400,
   },
-  // Clamp normalized head input before it reaches the camera adapter.
-  inputClamp: {
-    x: [-1, 1],
-    y: [-1, 1],
-    z: [0.65, 1.45],
-  },
-  // Single tuning surface for HeadTrack camera response.
-  camera: {
-    // Scale horizontal/vertical head angles only. Distance z stays raw.
+  movement: {
+    // Clamp normalized head input before it reaches the camera adapter.
+    inputClamp: {
+      x: [-1, 1],
+      y: [-1, 1],
+      z: [0.65, 1.45],
+    },
+    // Raise x for stronger left/right response. Raise y for stronger up/down response.
     headInputScale: {
-      x: 2.6,
-      y: 2,
+      x: 1.0,
+      y: 2.5,
     },
     // Flip axes if real-device movement feels reversed.
     invertX: false,
     invertY: false,
-    // Relative horizontal head movement rotates the camera around controls.target.
+    // Raise yawScale for stronger horizontal orbit around the cube.
     yawScale: 0.46,
-    // Vertical and distance offsets in scene world units.
+    // Raise y for more top/bottom reveal. Raise z for stronger forward/back distance.
     positionScale: {
       y: 55,
       z: 70,
     },
-    // Distance input also affects camera field of view.
+  },
+  camera: {
+    // Raise fovScale for stronger depth/zoom feel from forward/back movement.
     fovScale: 0.08,
-    // Time-based camera follow. Lower values feel faster.
+    // Lower responseMs follows faster. Higher responseMs feels smoother.
     responseMs: 55,
-    // Smoothing used when returning to the neutral view.
+    // Lower neutralReturnMs snaps back faster when tracking returns to center.
     neutralReturnMs: 120,
   },
-  // Delay before returning to neutral when no face is detected.
-  noFaceHoldMs: 400,
+} as const;
+
+export const cubeOrbitParallaxConfig = {
+  defaultEnabled: headTrackConfig.enabled.defaultOn,
+  fallbackToPointer: headTrackConfig.enabled.fallbackToPointer,
+  tracking: {
+    scoreThreshold: headTrackConfig.tracking.scoreThreshold,
+    video: headTrackConfig.performance.video,
+    maxFps: headTrackConfig.performance.maxFps,
+    smoothEyeMs: headTrackConfig.tracking.smoothEyeMs,
+    smoothDistanceMs: headTrackConfig.tracking.smoothDistanceMs,
+    smoothInputMs: headTrackConfig.tracking.smoothInputMs,
+    defaultDistance: headTrackConfig.tracking.defaultDistance,
+    horizontalYawWeight: headTrackConfig.tracking.horizontalYawWeight,
+  },
+  inputClamp: headTrackConfig.movement.inputClamp,
+  camera: {
+    headInputScale: headTrackConfig.movement.headInputScale,
+    invertX: headTrackConfig.movement.invertX,
+    invertY: headTrackConfig.movement.invertY,
+    yawScale: headTrackConfig.movement.yawScale,
+    positionScale: headTrackConfig.movement.positionScale,
+    fovScale: headTrackConfig.camera.fovScale,
+    responseMs: headTrackConfig.camera.responseMs,
+    neutralReturnMs: headTrackConfig.camera.neutralReturnMs,
+  },
+  noFaceHoldMs: headTrackConfig.tracking.noFaceHoldMs,
 } as const;
 export const cubeSceneTheme = {
   background: "#d6d6d6",
@@ -100,9 +135,7 @@ export const cubeSceneTheme = {
       speed: 0.55,
       resumeDelayMs: 1500,
     },
-    parallax: {
-      ...cubeOrbitParallaxConfig,
-    },
+    parallax: cubeOrbitParallaxConfig,
     frontViewFade: {
       strength: 1.0,
       power: 2.4,
