@@ -30,6 +30,7 @@ function getOrbitStatWidthClass(id: string) {
 
 export function SearchScreen({ onOpenStoryDetail, isActive = true }: SearchScreenProps) {
   const [chatSortRequest, setChatSortRequest] = useState<AiChatSortRequest | null>(null);
+  const [chatPanelResetId, setChatPanelResetId] = useState(0);
   const [exitOrbitViewRequestId, setExitOrbitViewRequestId] = useState(0);
   const [isOrbitView, setIsOrbitView] = useState(false);
   const [isParallaxViewEnabled, setIsParallaxViewEnabled] = useState<boolean>(
@@ -47,6 +48,12 @@ export function SearchScreen({ onOpenStoryDetail, isActive = true }: SearchScree
       requestId: (currentRequest?.requestId ?? 0) + 1,
       stage,
     }));
+  };
+
+  const handleBackToCubeMap = () => {
+    setChatSortRequest(null);
+    setChatPanelResetId((resetId) => resetId + 1);
+    setExitOrbitViewRequestId((requestId) => requestId + 1);
   };
 
   return (
@@ -106,7 +113,7 @@ export function SearchScreen({ onOpenStoryDetail, isActive = true }: SearchScree
 
           <AnimatedButton
             type="button"
-            onClick={() => setExitOrbitViewRequestId((requestId) => requestId + 1)}
+            onClick={handleBackToCubeMap}
             className="absolute left-[calc(var(--safe-left)+32px)] top-[calc(var(--safe-top)+32px)] z-20 flex h-[54px] items-center justify-center gap-[8px] rounded-full bg-[#2c2c2d] px-[22px] text-[20px] font-medium leading-[1.5] text-white backdrop-blur-[18.29px]"
             data-name="button/back-to-cube-map"
             aria-label="Back to cube map"
@@ -191,7 +198,10 @@ export function SearchScreen({ onOpenStoryDetail, isActive = true }: SearchScree
             </div>
           </nav>
 
-          <AiChatSortPanel onSortStageComplete={handleSortStageComplete} />
+          <AiChatSortPanel
+            key={chatPanelResetId}
+            onSortStageComplete={handleSortStageComplete}
+          />
         </>
       )}
     </section>

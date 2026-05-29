@@ -579,7 +579,7 @@ export default function CubeMapScene({
   onSceneReady,
 }: CubeMapSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const chatSortHandlerRef = useRef<((request: AiChatSortRequest) => void) | null>(null);
+  const chatSortHandlerRef = useRef<((request: AiChatSortRequest | null) => void) | null>(null);
   const searchHighlightHandlerRef = useRef<(() => void) | null>(null);
   const exitOrbitViewHandlerRef = useRef<(() => void) | null>(null);
   const orbitViewChangeRef = useRef(onOrbitViewChange);
@@ -616,10 +616,6 @@ export default function CubeMapScene({
   }, [parallaxViewEnabled]);
 
   useEffect(() => {
-    if (!chatSortRequest) {
-      return;
-    }
-
     if (chatSortHandlerRef.current) {
       chatSortHandlerRef.current(chatSortRequest);
       return;
@@ -1515,6 +1511,7 @@ export default function CubeMapScene({
 
     const applyHoverHighlightTarget = (targetMesh: CubeMesh | null) => {
       if (!targetMesh) {
+        setOutlineSource(null);
         setDefaultCubeTargets();
         return;
       }
@@ -1732,7 +1729,29 @@ export default function CubeMapScene({
       return shuffleItems(sourceMeshes).slice(0, count);
     };
 
-    const applyChatSortRequest = (request: AiChatSortRequest) => {
+    const resetChatSortHighlight = () => {
+      chatSortCandidateMeshes = [];
+      chatSortStage = null;
+      chatSortFinalMesh = null;
+      selectedMesh = null;
+      hovered = null;
+      delete container.dataset.searchHighlightKey;
+      syncChatSortDataset();
+      setOutlineSource(null);
+      resetSearchHighlightZoom();
+
+      if (viewMode === "map") {
+        container.style.cursor = "default";
+        setDefaultCubeTargets();
+      }
+    };
+
+    const applyChatSortRequest = (request: AiChatSortRequest | null) => {
+      if (!request) {
+        resetChatSortHighlight();
+        return;
+      }
+
       if (request.requestId === lastChatSortRequestId) {
         return;
       }
@@ -2055,6 +2074,7 @@ export default function CubeMapScene({
         spreadCubesFrom(hovered);
       } else {
         container.style.cursor = "default";
+        setOutlineSource(null);
         applyHoverHighlightTarget(null);
       }
     };
