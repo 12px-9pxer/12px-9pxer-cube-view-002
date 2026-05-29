@@ -98,7 +98,7 @@ button {
   min-height: 420px;
   overflow: hidden;
   background: #f7f6f6;
-  background: linear-gradient(180deg, rgb(247 246 246) 0%, rgb(214 214 214) 100%);
+  background: linear-gradient(180deg, rgb(197, 203, 207) 0%, rgb(255, 255, 255) 100%);
 }
 
 .cube-scene canvas {
@@ -289,6 +289,28 @@ button {
   backdrop-filter: blur(70px);
 }
 
+.ai-chat-sort-shell {
+  position: absolute;
+  right: 50px;
+  bottom: 100px;
+  z-index: 10;
+  width: min(460px, calc(var(--viewport-width) - 32px));
+  max-width: calc(var(--viewport-width) - 32px);
+}
+
+.ai-chat-sort-panel {
+  max-height: min(1220px, calc(var(--viewport-height) - 132px));
+}
+
+.ai-chat-sort-messages {
+  max-height: min(974px, calc(var(--viewport-height) - 342px));
+  scrollbar-width: none;
+}
+
+.ai-chat-sort-messages::-webkit-scrollbar {
+  display: none;
+}
+
 .comment-card-glass {
   backdrop-filter: blur(var(--comment-card-glass-blur, 80px));
   -webkit-backdrop-filter: blur(var(--comment-card-glass-blur, 80px));
@@ -300,6 +322,12 @@ button {
 }
 
 @media (max-width: 900px) {
+  .ai-chat-sort-shell {
+    right: 50%;
+    bottom: calc(var(--viewport-height) - var(--safe-bottom) + 24px);
+    transform: translateX(50%);
+  }
+
   .page3-comment-input {
     left: 16px !important;
     top: calc(var(--safe-bottom) - 76px - 16px) !important;

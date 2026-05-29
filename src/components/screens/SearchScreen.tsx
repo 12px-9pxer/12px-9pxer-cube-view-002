@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
+import {
+  type AiChatSortRequest,
+  type AiChatSortStage,
+} from "../../data/aiChatSortConfig";
 import { prototypeAssets, prototypeText } from "../../data/prototypeContent";
 import { CubeScenePlaceholder } from "../three/CubeScenePlaceholder";
 import { cubeSceneTheme } from "../three/cubeSceneTheme";
+import { AiChatSortPanel } from "./AiChatSortPanel";
 import { AnimatedButton } from "../ui/AnimatedButton";
 import { ArrowGlyph } from "../ui/ArrowGlyph";
 import { GlassIconButton } from "../ui/GlassIconButton";
 
 type SearchScreenProps = {
   onOpenStoryDetail: () => void;
+  isActive?: boolean;
 };
 
 function getOrbitStatWidthClass(id: string) {
@@ -22,9 +28,8 @@ function getOrbitStatWidthClass(id: string) {
   return "w-[79px]";
 }
 
-export function SearchScreen({ onOpenStoryDetail }: SearchScreenProps) {
-  const [query, setQuery] = useState("");
-  const [highlightRequestId, setHighlightRequestId] = useState(0);
+export function SearchScreen({ onOpenStoryDetail, isActive = true }: SearchScreenProps) {
+  const [chatSortRequest, setChatSortRequest] = useState<AiChatSortRequest | null>(null);
   const [exitOrbitViewRequestId, setExitOrbitViewRequestId] = useState(0);
   const [isOrbitView, setIsOrbitView] = useState(false);
   const [isParallaxViewEnabled, setIsParallaxViewEnabled] = useState<boolean>(
@@ -37,26 +42,28 @@ export function SearchScreen({ onOpenStoryDetail }: SearchScreenProps) {
     }
   }, [isOrbitView]);
 
-  const submitSearch = () => {
-    if (!query.trim()) {
-      return;
-    }
-
-    setHighlightRequestId((currentRequestId) => currentRequestId + 1);
+  const handleSortStageComplete = (stage: AiChatSortStage) => {
+    setChatSortRequest((currentRequest) => ({
+      requestId: (currentRequest?.requestId ?? 0) + 1,
+      stage,
+    }));
   };
 
   return (
     <section
-      className="screen-fill"
+      className={`screen-fill ${isActive ? "" : "pointer-events-none opacity-0"}`}
       data-node-id="15:88"
       data-name="02 Screen - Cube View Search"
+      aria-hidden={!isActive}
     >
       <CubeScenePlaceholder
-        highlightRequestId={highlightRequestId}
+        sceneActive={isActive}
+        chatSortRequest={chatSortRequest}
         exitOrbitViewRequestId={exitOrbitViewRequestId}
-        parallaxViewEnabled={isOrbitView && isParallaxViewEnabled}
+        parallaxViewEnabled={isActive && isOrbitView && isParallaxViewEnabled}
         onOrbitViewChange={setIsOrbitView}
         onParallaxViewUnavailable={() => setIsParallaxViewEnabled(false)}
+        onOpenStoryDetail={onOpenStoryDetail}
       />
 
       {isOrbitView ? (
@@ -184,64 +191,7 @@ export function SearchScreen({ onOpenStoryDetail }: SearchScreenProps) {
             </div>
           </nav>
 
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              submitSearch();
-            }}
-            className="glass-panel absolute left-[var(--viewport-center-x)] top-[calc(var(--safe-bottom)-189.4px-29.6px)] z-10 flex h-[189.4px] w-[901.49px] max-w-[calc(var(--viewport-width)-32px)] -translate-x-1/2 flex-col gap-[21.94px] rounded-[40.23px] p-[18.29px]"
-            data-node-id="15:107"
-            data-name="search/search-panel"
-          >
-            <label
-              className="flex h-[76.89px] w-full items-center rounded-[24px] bg-white/50 px-[21.94px] backdrop-blur-[40px]"
-              data-node-id="15:108"
-              data-name="search/query-input-field"
-            >
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={prototypeText.searchPlaceholder}
-                className="h-full w-full border-0 bg-transparent text-[22px] font-medium leading-[1.5] tracking-[-0.22px] text-[#2c2c2d] outline-none placeholder:text-[#2c2c2d]"
-                aria-label="Search query"
-              />
-            </label>
-
-            <div
-              className="flex h-[54px] w-full items-center justify-between"
-              data-node-id="15:110"
-              data-name="search/footer-actions-row"
-            >
-              <div className="flex gap-[10.97px]" data-name="search/suggestion-tags">
-                {prototypeText.searchTags.map((tag) => (
-                  <AnimatedButton
-                    key={tag}
-                    type="button"
-                    onClick={() => setQuery(tag)}
-                    className="h-[54px] rounded-full bg-black/40 px-[22px] text-[22px] font-medium leading-[1.5] tracking-[-0.22px] text-white backdrop-blur-[18.29px]"
-                    data-name={
-                      tag === prototypeText.searchTags[0]
-                        ? "tag/ai-feature"
-                        : "tag/working-mom"
-                    }
-                  >
-                    {tag}
-                  </AnimatedButton>
-                ))}
-              </div>
-
-              <AnimatedButton
-                type="submit"
-                className="flex h-[54px] w-[85.54px] items-center justify-center rounded-full bg-[#2c2c2d] px-[23.77px] py-[7.31px] text-white backdrop-blur-[18.29px]"
-                data-node-id="15:117"
-                data-name="button/search-submit-arrow"
-                aria-label="Search"
-                title="Search"
-              >
-                <ArrowGlyph />
-              </AnimatedButton>
-            </div>
-          </form>
+          <AiChatSortPanel onSortStageComplete={handleSortStageComplete} />
         </>
       )}
     </section>

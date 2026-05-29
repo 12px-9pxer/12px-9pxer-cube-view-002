@@ -479,8 +479,11 @@ export default function App() {
           <LandingScreen onGoToSearch={() => goToScreen("search")} />
         ) : null}
 
-        {screen === "search" ? (
-          <SearchScreen onOpenStoryDetail={goToDetailWithLoading} />
+        {screen === "search" || screen === "detail" ? (
+          <SearchScreen
+            isActive={screen === "search"}
+            onOpenStoryDetail={goToDetailWithLoading}
+          />
         ) : null}
 
         {screen === "detail" ? (
