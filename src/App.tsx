@@ -270,7 +270,7 @@ export default function App() {
         time: "방금 전",
         position: getNextCommentPosition(currentComments),
         avatarType: "initials",
-        initials: "ME",
+        initials: "나",
         isOwnedByCurrentUser: true,
         body,
       };

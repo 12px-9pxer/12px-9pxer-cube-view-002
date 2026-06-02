@@ -108,7 +108,7 @@ export function PollCard({
     >
       <div className="flex w-full flex-col gap-[4px]" data-name="poll/header">
         <h2 className="text-[20px] font-bold leading-[20px] tracking-[-0.6px]">
-          이 문제, 공감되시나요?
+          이런 순간, 있으셨나요?
         </h2>
         <p className="text-[14px] font-medium leading-[20px] tracking-[-0.28px] text-white/90">
           {prototypeText.pollQuestion}
