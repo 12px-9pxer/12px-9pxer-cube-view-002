@@ -292,6 +292,15 @@ export function AiChatSortPanel({ onSortStageComplete }: AiChatSortPanelProps) {
       return;
     }
 
+    if (trimmedMessage === aiChatSortConfig.shortcutPrompt) {
+      clearTimers();
+      setInputValue("");
+      setIsResponding(false);
+      setCompletedStages(aiChatSortConfig.aiReplies.length);
+      onSortStageComplete(3);
+      return;
+    }
+
     clearTimers();
     const nextStage = (completedStages + 1) as AiChatSortStage;
     const userMessageId = `user-${Date.now()}`;

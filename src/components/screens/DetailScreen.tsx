@@ -18,11 +18,8 @@ type DetailScreenProps = {
   comments: CommentItem[];
   selectedPollOption: PollOptionId | null;
   isPollSubmitted: boolean;
-  isPollCardDismissed: boolean;
   onBackToSearch: () => void;
   onSelectPollOption: (optionId: PollOptionId) => void;
-  onSubmitVote: () => void;
-  onDismissPollCard: () => void;
   onAddComment: (body: string) => void;
   onMoveComment: (commentId: string, position: CommentPosition) => void;
   onSettleComment: (
@@ -37,21 +34,20 @@ export function DetailScreen({
   comments,
   selectedPollOption,
   isPollSubmitted,
-  isPollCardDismissed,
   onBackToSearch,
   onSelectPollOption,
-  onSubmitVote,
-  onDismissPollCard,
   onAddComment,
   onMoveComment,
   onSettleComment,
   onDeleteComment,
 }: DetailScreenProps) {
   const [commentDraft, setCommentDraft] = useState("");
+  const [areCommentsVisible, setAreCommentsVisible] = useState(true);
   const page3Glass = prototypeParams.page3.glass;
   const commentInputStyle = createGlassStyle(page3Glass.commentInput);
   const commentSendButtonStyle = createGlassStyle(page3Glass.commentSendButton);
   const storyActionButtonStyle = createGlassStyle(page3Glass.iconButton);
+  const commentToggleLabel = areCommentsVisible ? "댓글 숨기기" : "댓글 보이기";
 
   const submitComment = () => {
     const trimmed = commentDraft.trim();
@@ -132,13 +128,20 @@ export function DetailScreen({
         data-name="nav/story-action-buttons"
       >
         <GlassIconButton
-          iconSrc={prototypeAssets.storyActionLeftIcon}
-          label="스토리 보기"
-          onClick={() => undefined}
+          label={commentToggleLabel}
+          onClick={() => setAreCommentsVisible((isVisible) => !isVisible)}
           style={storyActionButtonStyle}
           nodeId="15:28"
           dataName="nav/story-action-button-left"
-        />
+          aria-pressed={!areCommentsVisible}
+        >
+          <span
+            className="material-symbols-outlined text-[24px] leading-none"
+            aria-hidden="true"
+          >
+            {areCommentsVisible ? "visibility" : "visibility_off"}
+          </span>
+        </GlassIconButton>
         <GlassIconButton
           iconSrc={prototypeAssets.storyActionRightIcon}
           label="공유"
@@ -149,32 +152,31 @@ export function DetailScreen({
         />
       </div>
 
-      {!isPollCardDismissed ? (
-        <PollCard
-          selectedOption={selectedPollOption}
-          isSubmitted={isPollSubmitted}
-          onSelectOption={onSelectPollOption}
-          onSubmitVote={onSubmitVote}
-          onDismissAfterSubmit={onDismissPollCard}
-        />
-      ) : null}
+      <PollCard
+        selectedOption={selectedPollOption}
+        isSubmitted={isPollSubmitted}
+        onSelectOption={onSelectPollOption}
+      />
 
-      {comments.map((comment) => {
-        const commentMeta = getCommentMeta(comment);
+      {areCommentsVisible
+        ? comments.map((comment) => {
+            const commentMeta = getCommentMeta(comment);
+            const canDeleteComment = comment.isOwnedByCurrentUser === true;
 
-        return (
-          <DraggableCommentCard
-            key={comment.id}
-            comment={comment}
-            entranceDelay={comment.id.startsWith("local-") ? 0 : 0.28}
-            nodeId={commentMeta.nodeId}
-            dataName={commentMeta.dataName}
-            onMove={onMoveComment}
-            onDragEnd={onSettleComment}
-            onDelete={onDeleteComment}
-          />
-        );
-      })}
+            return (
+              <DraggableCommentCard
+                key={comment.id}
+                comment={comment}
+                entranceDelay={comment.id.startsWith("local-") ? 0 : 0.28}
+                nodeId={commentMeta.nodeId}
+                dataName={commentMeta.dataName}
+                onMove={onMoveComment}
+                onDragEnd={onSettleComment}
+                onDelete={canDeleteComment ? onDeleteComment : undefined}
+              />
+            );
+          })
+        : null}
 
       <ReactionBar />
 

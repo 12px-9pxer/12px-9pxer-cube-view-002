@@ -36,11 +36,13 @@ export type CommentItem = {
   };
   avatarType: "initials" | "image";
   initials?: string;
+  isOwnedByCurrentUser?: boolean;
 };
 
 export type PollOption = {
   id: PollOptionId;
   label: string;
+  resultPercent: number;
 };
 
 export type ReactionItem = {
@@ -99,15 +101,17 @@ export const reactions: ReactionItem[] = [
 ];
 
 export const pollOptions: PollOption[] = [
-  { id: "childCrying", label: "아이가 울 때 멈출 수 없을 때" },
-  { id: "mirrorVisibility", label: "룸미러로 봐도 상태가 잘 안 보일 때" },
+  { id: "childCrying", label: "아이가 울 때 멈출 수 없을 때", resultPercent: 15 },
+  { id: "mirrorVisibility", label: "룸미러로 봐도 상태가 잘 안 보일 때", resultPercent: 45 },
   {
     id: "climateWindowControl",
     label: "온도나 창문 조절이 필요한데 운전 중일 때",
+    resultPercent: 5,
   },
   {
     id: "suddenSafetyAction",
     label: "돌발 행동 (안전벨트 풀기 등)이 걱정될 때",
+    resultPercent: 35,
   },
 ];
 

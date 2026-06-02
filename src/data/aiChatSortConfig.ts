@@ -24,6 +24,7 @@ export const aiChatSortConfig = {
   ],
   quickPrompts: ["Ai 활용 기능", "워킹맘"],
   inputPlaceholder: "질문을 입력하세요.",
+  shortcutPrompt: "킁킁",
   thinkingAnimationSrc: "/assets/lottie/loading-dots-cropped.json",
   aiResponseDelayMs: 1000,
   thinkingDurationMs: 1500,

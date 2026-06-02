@@ -18,7 +18,7 @@ type DraggableCommentCardProps = {
     position: CommentPosition,
     velocity: CommentVelocity,
   ) => void;
-  onDelete: (commentId: string) => void;
+  onDelete?: (commentId: string) => void;
   nodeId?: string;
   dataName?: string;
 };
@@ -86,7 +86,7 @@ export function DraggableCommentCard({
   }, []);
 
   const handleDelete = () => {
-    if (!motionLayerRef.current || isDeletingRef.current) {
+    if (!motionLayerRef.current || isDeletingRef.current || !onDelete) {
       return;
     }
 
@@ -179,7 +179,7 @@ export function DraggableCommentCard({
           comment={comment}
           nodeId={nodeId}
           dataName={dataName}
-          onDelete={handleDelete}
+          onDelete={onDelete ? handleDelete : undefined}
         />
       </div>
     </div>

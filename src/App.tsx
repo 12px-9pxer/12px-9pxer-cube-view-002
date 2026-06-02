@@ -84,7 +84,6 @@ export default function App() {
   });
   const [selectedPollOption, setSelectedPollOption] = useState<PollOptionId | null>(null);
   const [isPollSubmitted, setIsPollSubmitted] = useState(false);
-  const [isPollCardDismissed, setIsPollCardDismissed] = useState(false);
   const [comments, setComments] = useState<CommentItem[]>(() => {
     const initialCommentStackPositions = getInitialCommentStackPositions(2);
 
@@ -272,6 +271,7 @@ export default function App() {
         position: getNextCommentPosition(currentComments),
         avatarType: "initials",
         initials: "ME",
+        isOwnedByCurrentUser: true,
         body,
       };
 
@@ -398,22 +398,25 @@ export default function App() {
   };
 
   const deleteComment = (commentId: string) => {
-    setComments((currentComments) =>
-      currentComments.filter((comment) => comment.id !== commentId),
-    );
+    setComments((currentComments) => {
+      const targetComment = currentComments.find((comment) => comment.id === commentId);
+
+      if (!targetComment?.isOwnedByCurrentUser) {
+        return currentComments;
+      }
+
+      return currentComments.filter((comment) => comment.id !== commentId);
+    });
   };
 
-  const submitVote = () => {
-    if (!selectedPollOption) {
+  const selectPollOption = (optionId: PollOptionId) => {
+    if (isPollSubmitted) {
       return;
     }
 
+    setSelectedPollOption(optionId);
     setIsPollSubmitted(true);
   };
-
-  const dismissPollCard = useCallback(() => {
-    setIsPollCardDismissed(true);
-  }, []);
 
   const goToScreen = useCallback((nextScreen: ScreenId) => {
     const currentScreen = activeScreenRef.current;
@@ -491,11 +494,8 @@ export default function App() {
             comments={comments}
             selectedPollOption={selectedPollOption}
             isPollSubmitted={isPollSubmitted}
-            isPollCardDismissed={isPollCardDismissed}
             onBackToSearch={() => goToScreen("search")}
-            onSelectPollOption={setSelectedPollOption}
-            onSubmitVote={submitVote}
-            onDismissPollCard={dismissPollCard}
+            onSelectPollOption={selectPollOption}
             onAddComment={addComment}
             onMoveComment={moveComment}
             onSettleComment={settleComment}
