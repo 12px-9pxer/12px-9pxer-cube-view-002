@@ -110,14 +110,14 @@ export function DetailScreen({
       </AnimatedButton>
 
       <header
-        className="absolute left-[var(--viewport-center-x)] top-[calc(var(--safe-top)+35px)] flex h-[75px] w-[206px] -translate-x-1/2 flex-col items-center text-center text-white"
+        className="absolute left-[var(--viewport-center-x)] top-[calc(var(--safe-top)+30px)] flex h-[100px] w-[420px] -translate-x-1/2 flex-col items-center text-center text-white"
         data-node-id="15:13"
         data-name="header/story-title-and-stats"
       >
-        <h1 className="whitespace-nowrap text-[32px] font-bold leading-[1.5] tracking-[-0.32px]">
+        <h1 className="w-full whitespace-nowrap text-center text-[48px] font-bold leading-[1.25] tracking-[-0.48px]">
           {prototypeText.storyTitle}
         </h1>
-        <p className="whitespace-nowrap text-[18px] font-semibold leading-[1.5] tracking-[-0.18px] text-white/80">
+        <p className="w-full whitespace-nowrap text-center text-[18px] font-semibold leading-[1.5] tracking-[-0.18px] text-white/80">
           {prototypeText.storyStats}
         </p>
       </header>

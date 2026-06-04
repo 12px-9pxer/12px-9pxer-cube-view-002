@@ -354,6 +354,7 @@ export function AiChatSortPanel({ onSortStageComplete }: AiChatSortPanelProps) {
 
   const isComplete = completedStages >= aiChatSortConfig.aiReplies.length;
   const isInputDisabled = isResponding || isComplete;
+  const hasQuickPrompts = aiChatSortConfig.quickPrompts.length > 0;
 
   return (
     <div className="ai-chat-sort-shell pointer-events-auto" data-name="ai_search">
@@ -402,25 +403,37 @@ export function AiChatSortPanel({ onSortStageComplete }: AiChatSortPanelProps) {
           className="flex w-full shrink-0 flex-col items-start gap-[18px] rounded-[40.229px] border-2 border-[rgba(255,255,255,0.05)] bg-[rgba(196,196,196,0.2)] p-[18.286px] backdrop-blur-[25px]"
           data-name="search panel"
         >
-          <label
-            className="flex w-full shrink-0 flex-col items-start justify-center rounded-[24px] bg-[rgba(255,255,255,0.5)] px-[20px] py-[16px] backdrop-blur-[20px]"
-            data-name="search bar"
-          >
-            <input
-              ref={inputRef}
-              value={inputValue}
-              onChange={(event) => setInputValue(event.target.value)}
-              disabled={isInputDisabled}
-              placeholder={
-                isComplete ? "최종 큐브를 선택하세요." : aiChatSortConfig.inputPlaceholder
-              }
-              className="h-[30px] w-full border-0 bg-transparent text-[20px] leading-[1.5] tracking-[-0.2px] text-[#2c2c2d] outline-none placeholder:text-[#5b5b5b] disabled:cursor-default"
-              aria-label="AI chat sorting message"
-            />
-          </label>
+          <div className="flex w-full shrink-0 items-center gap-[12px]" data-name="search-row">
+            <label
+              className="flex min-w-0 flex-1 shrink items-start justify-center rounded-[24px] bg-[rgba(255,255,255,0.5)] px-[20px] py-[16px] backdrop-blur-[20px]"
+              data-name="search bar"
+            >
+              <input
+                ref={inputRef}
+                value={inputValue}
+                onChange={(event) => setInputValue(event.target.value)}
+                disabled={isInputDisabled}
+                placeholder={
+                  isComplete ? "최종 큐브를 선택하세요." : aiChatSortConfig.inputPlaceholder
+                }
+                className="h-[30px] w-full border-0 bg-transparent text-[20px] leading-[1.5] tracking-[-0.2px] text-[#2c2c2d] outline-none placeholder:text-[#5b5b5b] disabled:cursor-default"
+                aria-label="AI chat sorting message"
+              />
+            </label>
+            <AnimatedButton
+              type="submit"
+              disabled={isInputDisabled || !inputValue.trim()}
+              className="flex h-[54px] w-[85.54px] shrink-0 items-center justify-center rounded-full bg-[#2c2c2d] px-[23.771px] py-[7.314px] text-white backdrop-blur-[9.143px] disabled:cursor-default disabled:opacity-45"
+              data-name="button_enter"
+              aria-label="Send message"
+              title="Send message"
+            >
+              <span className="block text-[25.6px] leading-[1.5] tracking-[-0.256px]">→</span>
+            </AnimatedButton>
+          </div>
 
-          <div className="flex w-full shrink-0 items-center justify-between gap-[14px]" data-name="layout">
-            <div className="flex min-w-0 items-center gap-[10.971px]" data-name="layout">
+          {hasQuickPrompts ? (
+            <div className="flex w-full shrink-0 items-center gap-[10.971px]" data-name="layout">
               {aiChatSortConfig.quickPrompts.map((prompt) => (
                 <AnimatedButton
                   key={prompt}
@@ -434,18 +447,7 @@ export function AiChatSortPanel({ onSortStageComplete }: AiChatSortPanelProps) {
                 </AnimatedButton>
               ))}
             </div>
-
-            <AnimatedButton
-              type="submit"
-              disabled={isInputDisabled || !inputValue.trim()}
-              className="flex h-[54px] w-[85.54px] shrink-0 items-center justify-center rounded-full bg-[#2c2c2d] px-[23.771px] py-[7.314px] text-white backdrop-blur-[9.143px] disabled:cursor-default disabled:opacity-45"
-              data-name="button_enter"
-              aria-label="Send message"
-              title="Send message"
-            >
-              <span className="block text-[25.6px] leading-[1.5] tracking-[-0.256px]">→</span>
-            </AnimatedButton>
-          </div>
+          ) : null}
         </form>
       </div>
     </div>

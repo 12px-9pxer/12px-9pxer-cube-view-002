@@ -75,6 +75,7 @@ type CubeMeshUserData = CubeMapOverviewNode & {
   targetEmissiveStrength: number;
   targetFrontViewFadeStrength: number;
   maskOccluder: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  axisDepthOccluder: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
 };
 
 type CubeMesh = THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial> & {
@@ -429,6 +430,287 @@ function updateGridPlaneVisibility(
   });
 }
 
+function drawRoundedRect(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  const resolvedRadius = Math.min(radius, width / 2, height / 2);
+
+  context.beginPath();
+  context.moveTo(x + resolvedRadius, y);
+  context.lineTo(x + width - resolvedRadius, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + resolvedRadius);
+  context.lineTo(x + width, y + height - resolvedRadius);
+  context.quadraticCurveTo(x + width, y + height, x + width - resolvedRadius, y + height);
+  context.lineTo(x + resolvedRadius, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - resolvedRadius);
+  context.lineTo(x, y + resolvedRadius);
+  context.quadraticCurveTo(x, y, x + resolvedRadius, y);
+  context.closePath();
+}
+
+function wrapAxisGuideText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+) {
+  const characters = Array.from(text);
+  const lines: string[] = [];
+  let currentLine = "";
+
+  characters.forEach((character) => {
+    const nextLine = `${currentLine}${character}`;
+
+    if (currentLine && context.measureText(nextLine).width > maxWidth) {
+      lines.push(currentLine);
+      currentLine = character;
+      return;
+    }
+
+    currentLine = nextLine;
+  });
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  return lines;
+}
+
+function createAxisGuideTextSprite(
+  text: string,
+  {
+    fontSize,
+    fontWeight,
+    maxCanvasWidth,
+    height,
+    textColor,
+    backgroundColor,
+    borderColor,
+    fontFamily,
+  }: {
+    fontSize: number;
+    fontWeight: number;
+    maxCanvasWidth: number;
+    height: number;
+    textColor: string;
+    backgroundColor: string;
+    borderColor: string;
+    fontFamily: string;
+  },
+) {
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  const paddingX = fontSize * 0.72;
+  const paddingY = fontSize * 0.42;
+  const lineHeight = fontSize * 1.18;
+  const measurementCanvas = document.createElement("canvas");
+  const measurementContext = measurementCanvas.getContext("2d");
+
+  if (!measurementContext) {
+    return new THREE.Sprite();
+  }
+
+  measurementContext.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+  const maxTextWidth = maxCanvasWidth - paddingX * 2;
+  const lines = wrapAxisGuideText(measurementContext, text, maxTextWidth);
+  const textWidth = Math.max(...lines.map((line) => measurementContext.measureText(line).width));
+  const canvasWidth = Math.ceil(Math.min(maxCanvasWidth, textWidth + paddingX * 2));
+  const canvasHeight = Math.ceil(lines.length * lineHeight + paddingY * 2);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(canvasWidth * pixelRatio);
+  canvas.height = Math.ceil(canvasHeight * pixelRatio);
+
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    return new THREE.Sprite();
+  }
+
+  context.scale(pixelRatio, pixelRatio);
+  drawRoundedRect(context, 1, 1, canvasWidth - 2, canvasHeight - 2, canvasHeight / 2);
+  context.fillStyle = backgroundColor;
+  context.fill();
+  context.lineWidth = 1;
+  context.strokeStyle = borderColor;
+  context.stroke();
+
+  context.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+  context.fillStyle = textColor;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+
+  lines.forEach((line, index) => {
+    const textY = paddingY + lineHeight * index + lineHeight / 2;
+    context.fillText(line, canvasWidth / 2, textY);
+  });
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = false;
+  texture.needsUpdate = true;
+
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: true,
+    depthWrite: false,
+  });
+  const sprite = new THREE.Sprite(material);
+  const aspect = canvasWidth / canvasHeight;
+  sprite.scale.set(height * aspect, height, 1);
+
+  return sprite;
+}
+
+function createAxisGuideLineSegments(
+  segments: THREE.Vector3[],
+  color: THREE.ColorRepresentation,
+  opacity: number,
+) {
+  const positions: number[] = [];
+
+  segments.forEach((point) => {
+    positions.push(point.x, point.y, point.z);
+  });
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  const material = new THREE.LineBasicMaterial({
+    color,
+    transparent: true,
+    opacity,
+    depthTest: true,
+    depthWrite: false,
+  });
+  const lineSegments = new THREE.LineSegments(geometry, material);
+
+  return lineSegments;
+}
+
+function createAxisGuideGroup() {
+  const { axisGuide } = cubeSceneTheme;
+  const group = new THREE.Group();
+  const axisLength = GRID_MAX - GRID_MIN;
+  const origin = new THREE.Vector3(GRID_MIN, GRID_MIN, GRID_MIN);
+  const lineSegments: THREE.Vector3[] = [];
+  const tickSegments: THREE.Vector3[] = [];
+  const axes = [
+    {
+      id: "x",
+      direction: new THREE.Vector3(1, 0, 0),
+      tickDirection: new THREE.Vector3(0, 1, 0),
+      labelOffset: new THREE.Vector3(0, -axisGuide.labelOffset, axisGuide.axisPadding * 0.24),
+      titleOffset: new THREE.Vector3(axisGuide.titleOffset, 0, 0),
+      title: axisGuide.axes.x.title,
+      values: axisGuide.axes.x.values,
+    },
+    {
+      id: "y",
+      direction: new THREE.Vector3(0, 1, 0),
+      tickDirection: new THREE.Vector3(1, 0, 0),
+      labelOffset: new THREE.Vector3(-axisGuide.labelOffset * 1.25, 0, axisGuide.axisPadding * 0.24),
+      titleOffset: new THREE.Vector3(0, axisGuide.titleOffset, 0),
+      title: axisGuide.axes.y.title,
+      values: axisGuide.axes.y.values,
+    },
+    {
+      id: "z",
+      direction: new THREE.Vector3(0, 0, 1),
+      tickDirection: new THREE.Vector3(0, 1, 0),
+      labelOffset: new THREE.Vector3(-axisGuide.labelOffset * 0.25, -axisGuide.labelOffset, 0),
+      titleOffset: new THREE.Vector3(0, 0, axisGuide.titleOffset),
+      title: axisGuide.axes.z.title,
+      values: axisGuide.axes.z.values,
+    },
+  ];
+
+  axes.forEach((axis) => {
+    const endPoint = origin.clone().add(axis.direction.clone().multiplyScalar(axisLength));
+    lineSegments.push(origin.clone(), endPoint.clone());
+
+    axis.values.forEach((value, index) => {
+      const progress = axis.values.length <= 1 ? 0 : index / (axis.values.length - 1);
+      const point = origin.clone().add(axis.direction.clone().multiplyScalar(axisLength * progress));
+      const tickStart = point
+        .clone()
+        .add(axis.tickDirection.clone().multiplyScalar(-axisGuide.tickLength * 0.5));
+      const tickEnd = point
+        .clone()
+        .add(axis.tickDirection.clone().multiplyScalar(axisGuide.tickLength * 0.5));
+      tickSegments.push(tickStart, tickEnd);
+
+      const label = createAxisGuideTextSprite(value, {
+        fontSize: axisGuide.labelFontSize,
+        fontWeight: 600,
+        maxCanvasWidth: axisGuide.labelMaxCanvasWidth,
+        height: axisGuide.labelHeight,
+        textColor: axisGuide.labelTextColor,
+        backgroundColor: axisGuide.labelBackgroundColor,
+        borderColor: axisGuide.labelBorderColor,
+        fontFamily: axisGuide.fontFamily,
+      });
+      label.position.copy(point.clone().add(axis.labelOffset));
+      group.add(label);
+    });
+
+    const title = createAxisGuideTextSprite(axis.title, {
+      fontSize: axisGuide.titleFontSize,
+      fontWeight: 700,
+      maxCanvasWidth: axisGuide.titleMaxCanvasWidth,
+      height: axisGuide.titleHeight,
+      textColor: axisGuide.titleTextColor,
+      backgroundColor: axisGuide.titleBackgroundColor,
+      borderColor: axisGuide.labelBorderColor,
+      fontFamily: axisGuide.fontFamily,
+    });
+    title.position.copy(endPoint.add(axis.titleOffset));
+    group.add(title);
+  });
+
+  group.add(
+    createAxisGuideLineSegments(
+      lineSegments,
+      axisGuide.lineColor,
+      axisGuide.lineOpacity,
+    ),
+  );
+  group.add(
+    createAxisGuideLineSegments(
+      tickSegments,
+      axisGuide.tickColor,
+      axisGuide.tickOpacity,
+    ),
+  );
+
+  return group;
+}
+
+function disposeAxisGuideGroup(group: THREE.Group) {
+  group.traverse((child) => {
+    const sprite = child as THREE.Sprite;
+    const spriteMaterial = sprite.material as THREE.SpriteMaterial | undefined;
+
+    if (spriteMaterial?.map) {
+      spriteMaterial.map.dispose();
+    }
+
+    if ((child as THREE.LineSegments).geometry) {
+      (child as THREE.LineSegments).geometry.dispose();
+    }
+
+    if ((child as THREE.LineSegments).material) {
+      disposeMaterial((child as THREE.LineSegments).material);
+    }
+  });
+  group.clear();
+}
+
 function createMaskOutlineMaterial(maskTexture: THREE.Texture) {
   return new THREE.ShaderMaterial({
     uniforms: {
@@ -700,6 +982,12 @@ export default function CubeMapScene({
       depthTest: true,
       depthWrite: true,
     });
+    const axisDepthOccluderMaterial = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      colorWrite: false,
+      depthTest: true,
+      depthWrite: true,
+    });
     const overlayScene = new THREE.Scene();
     const overlayCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     const overlayGeometry = new THREE.PlaneGeometry(2, 2);
@@ -779,6 +1067,11 @@ export default function CubeMapScene({
       }),
     ];
     gridPlanes.forEach((gridPlane) => scene.add(gridPlane));
+    const axisGuideScene = new THREE.Scene();
+    axisGuideScene.fog = scene.fog;
+    const axisDepthScene = new THREE.Scene();
+    const axisGuideGroup = createAxisGuideGroup();
+    axisGuideScene.add(axisGuideGroup);
 
     const nodesGroup = new THREE.Group();
     const cubeMeshes: CubeMesh[] = [];
@@ -797,6 +1090,9 @@ export default function CubeMapScene({
     const maskOccludersGroup = new THREE.Group();
     maskOccludersGroup.visible = false;
     maskScene.add(maskOccludersGroup);
+    const axisDepthOccludersGroup = new THREE.Group();
+    axisDepthOccludersGroup.visible = true;
+    axisDepthScene.add(axisDepthOccludersGroup);
 
     const primaryLight = cubeSceneTheme.lights.directional[0];
     const shaderTheme = cubeSceneTheme.cube.shader;
@@ -878,6 +1174,11 @@ export default function CubeMapScene({
         maskOccluder.visible = false;
         maskOccluder.frustumCulled = false;
         maskOccludersGroup.add(maskOccluder);
+        const axisDepthOccluder = new THREE.Mesh(nodeGeometry, axisDepthOccluderMaterial);
+        axisDepthOccluder.matrixAutoUpdate = false;
+        axisDepthOccluder.visible = false;
+        axisDepthOccluder.frustumCulled = false;
+        axisDepthOccludersGroup.add(axisDepthOccluder);
 
         mesh.userData = {
           ...node,
@@ -900,6 +1201,7 @@ export default function CubeMapScene({
           targetEmissiveStrength: cubeSceneTheme.mapView.emissiveStrength,
           targetFrontViewFadeStrength: 0,
           maskOccluder,
+          axisDepthOccluder,
         };
         nodesGroup.add(mesh);
         cubeMeshes.push(mesh);
@@ -2125,7 +2427,11 @@ export default function CubeMapScene({
         gridPlanes.forEach((gridPlane) => {
           gridPlane.visible = false;
         });
+        axisGuideGroup.visible = false;
+        axisDepthOccludersGroup.visible = false;
       } else {
+        axisGuideGroup.visible = true;
+        axisDepthOccludersGroup.visible = true;
         updateGridPlaneVisibility(
           gridPlanes,
           camera,
@@ -2150,6 +2456,15 @@ export default function CubeMapScene({
         mesh.position.lerp(mesh.userData.targetPosition, cubeSceneTheme.hover.positionLerp);
         targetScaleVector.setScalar(mesh.userData.targetScale * mesh.userData.entryProgress);
         mesh.scale.lerp(targetScaleVector, cubeSceneTheme.hover.scaleLerp);
+        const shouldOccludeAxisGuide = viewMode === "map" && mesh.userData.entryProgress > 0.001;
+        mesh.userData.axisDepthOccluder.visible = shouldOccludeAxisGuide;
+
+        if (shouldOccludeAxisGuide) {
+          mesh.updateWorldMatrix(true, false);
+          mesh.userData.axisDepthOccluder.matrix.copy(mesh.matrixWorld);
+          mesh.userData.axisDepthOccluder.matrixWorldNeedsUpdate = true;
+          mesh.userData.axisDepthOccluder.updateMatrixWorld(true);
+        }
 
         const { material } = mesh;
         const opacity = lerpValue(
@@ -2268,6 +2583,12 @@ export default function CubeMapScene({
       renderer.clear(true, true, true);
       renderer.render(scene, camera);
 
+      if (axisGuideGroup.visible) {
+        renderer.clearDepth();
+        renderer.render(axisDepthScene, camera);
+        renderer.render(axisGuideScene, camera);
+      }
+
       if (shouldRenderOutlineMesh) {
         outlineMaterial.uniforms.time.value = sceneTime;
         outlineMaterial.uniforms.opacity.value = outlineOpacity;
@@ -2298,6 +2619,10 @@ export default function CubeMapScene({
       }
       stopParallaxInput();
       controls.dispose();
+      axisGuideScene.remove(axisGuideGroup);
+      axisDepthScene.remove(axisDepthOccludersGroup);
+      disposeAxisGuideGroup(axisGuideGroup);
+      axisDepthOccludersGroup.clear();
       disposeStoryThumbnailCube();
       disposeObject(scene);
       nodeGeometry?.dispose();
@@ -2308,6 +2633,7 @@ export default function CubeMapScene({
       maskRenderTarget.dispose();
       maskMaterial.dispose();
       maskOccluderMaterial.dispose();
+      axisDepthOccluderMaterial.dispose();
       overlayGeometry.dispose();
       outlineMaterial.dispose();
       renderer.dispose();

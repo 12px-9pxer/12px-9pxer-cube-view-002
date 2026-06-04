@@ -15,10 +15,10 @@ export function LandingScreen({ onGoToSearch }: LandingScreenProps) {
       data-name="01 Screen - Landing Intro (시작 화면)"
     >
       <UserStoryLogo
-        className="absolute left-[calc(var(--viewport-center-x)-102.5px)] top-[calc(var(--viewport-center-y)-80px)]"
+        className="absolute left-[calc(var(--viewport-center-x)-210px)] top-[calc(var(--viewport-center-y)-110px)]"
         nodeId="15:160"
-        width={205}
-        height={97}
+        width={420}
+        height={118}
       />
 
       <AnimatedButton
@@ -31,6 +31,20 @@ export function LandingScreen({ onGoToSearch }: LandingScreenProps) {
         <span>{prototypeText.landingButton}</span>
         <ArrowGlyph />
       </AnimatedButton>
+
+      <div
+        className="absolute bottom-[56px] left-[var(--viewport-center-x)] flex h-[16px] -translate-x-1/2 items-center"
+        data-node-id="1897:863"
+        data-name="brand/landing-bottom-hyundai-kia-logos"
+        aria-label="Hyundai Kia"
+      >
+        <img
+          src="/assets/figma/logo-hyundai-kia-bottom.png"
+          alt="Hyundai Kia"
+          className="h-[16px] w-auto"
+          draggable={false}
+        />
+      </div>
     </section>
   );
 }

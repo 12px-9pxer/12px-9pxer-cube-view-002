@@ -1,5 +1,3 @@
-import { prototypeAssets } from "../../data/prototypeContent";
-
 type UserStoryLogoProps = {
   className?: string;
   shadowClassName?: string;
@@ -17,17 +15,18 @@ export function UserStoryLogo({
 }: UserStoryLogoProps) {
   return (
     <div
-      className={`${shadowClassName} ${className}`}
+      className={`flex flex-col items-center justify-center text-center text-white ${shadowClassName} ${className}`}
       style={{ width, height }}
       data-node-id={nodeId}
-      data-name="brand/logo-component - User Story"
+      data-name="brand/logo-component - User Story MI Platform"
+      aria-label="User Story MI Platform"
     >
-      <img
-        src={prototypeAssets.logoUserStory}
-        alt="HYUNDAI User Story"
-        className="h-full w-full object-contain"
-        draggable={false}
-      />
+      <span className="block whitespace-nowrap text-[54px] font-semibold leading-[0.98] tracking-[-1.08px]">
+        User Story
+      </span>
+      <span className="mt-[12px] block whitespace-nowrap text-[38px] font-medium leading-[1] tracking-[-0.38px]">
+        MI Platform
+      </span>
     </div>
   );
 }

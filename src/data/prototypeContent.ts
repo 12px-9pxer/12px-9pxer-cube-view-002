@@ -82,12 +82,12 @@ export const prototypeText = {
   ],
   searchPlaceholder: "검색어 입력",
   searchTags: ["Ai 활용 기능", "워킹맘"],
-  storyTitle: "육아 전쟁의 시작",
+  storyTitle: "워킹맘의 딜레마",
   storyStats: "조회수 2.4천회 | 댓글 38개",
   commentPlaceholder: "여러분의 경험을 댓글로 남겨주세요!",
   pollQuestion:
-    "예상하지 못한 변수 하나가 하루의 계획을 모두 흔들어 놓을 때가 있습니다.",
-  pollSubQuestion: "Q. 갑작스러운 변수 앞에서 가장 힘든 것은?",
+    "아이를 위해 열심히 달려왔지만, 문듯 좋은 부모 역할을 놓치고 있다는 생각이 들 때가 있습니다.",
+  pollSubQuestion: "Q. 이 순간 가장 원했던 것은?",
   pollSubmit: "투표하기",
   pollDone: "투표 완료",
 };
@@ -101,16 +101,16 @@ export const reactions: ReactionItem[] = [
 ];
 
 export const pollOptions: PollOption[] = [
-  { id: "childCrying", label: "갑작스러운 변수로 하루 계획이 무너질 때", resultPercent: 15 },
-  { id: "mirrorVisibility", label: "아이를 실망시킬까 걱정될 때", resultPercent: 45 },
+  { id: "childCrying", label: "아이와 더 많은 시간을 보낼 수 있는 여유", resultPercent: 15 },
+  { id: "mirrorVisibility", label: "짧아도 깊게 교감할 수 있는 방법", resultPercent: 45 },
   {
     id: "climateWindowControl",
-    label: "회사에 피해를 줄까 눈치 보일 때",
+    label: "일과 육아를 모두 놓치지 않는 환경",
     resultPercent: 5,
   },
   {
     id: "suddenSafetyAction",
-    label: "어느 쪽을 선택해도 죄책감이 남을 때",
+    label: "좋은 부모라는 확신과 안도감",
     resultPercent: 35,
   },
 ];
@@ -124,7 +124,7 @@ export const initialComments: CommentItem[] = [
     position: { x: 528, y: 440 },
     avatarType: "initials",
     initials: "SY",
-    body: `흥미로운 점은 체험학습 자체가 문제가 아니라, 갑작스럽게 계획이 무너졌다는 점에서 더 큰 스트레스를 느끼는 것 같아요. 워킹맘들은 예상 가능한 바쁨보다 예상 밖 변수를 훨씬 힘들어하더라고요.`,
+    body: `물리적으로 함께할 수 없는 시간을 기술이 얼마나 보완할 수 있을지가 앞으로 중요한 과제가 될 것 같습니다.`,
   },
   {
     id: "engineer",
@@ -133,6 +133,6 @@ export const initialComments: CommentItem[] = [
     time: "오후 12:15",
     position: { x: 81, y: 683 },
     avatarType: "image",
-    body: "차량 OBD2 포트나 제조사 SDK로 차일드락 연동 가능성 체크해봤는데 현대/기아 기준으로 CCAPI 접근은 되는 것 같아요. 실제 앱 제어는 인증 이슈가 있을 수 있어요.결국 원하는 건 ‘시간 절약’보다도 ‘일상의 통제감’인 것 같습니다. 예상치 못한 변수가 생겨도 하루 전체가 무너지지 않는 경험이 중요해 보여요.",
+    body: "결국 워킹맘이 원하는 건 더 많은 시간이 아니라, 제한된 시간 안에서도 좋은 부모라고 느낄 수 있는 확신인 것 같습니다.",
   },
 ];

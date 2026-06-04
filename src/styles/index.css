@@ -316,6 +316,10 @@ button {
   -webkit-backdrop-filter: blur(var(--comment-card-glass-blur, 80px));
 }
 
+.cube-top-bar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 .text-crisp {
   -webkit-font-smoothing: antialiased;
   text-rendering: geometricPrecision;
@@ -339,6 +343,7 @@ button {
 
   .page3-poll-card {
     top: calc(var(--safe-top) + 112px) !important;
+    bottom: auto !important;
   }
 
 }

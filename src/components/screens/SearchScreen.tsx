@@ -3,13 +3,12 @@ import {
   type AiChatSortRequest,
   type AiChatSortStage,
 } from "../../data/aiChatSortConfig";
-import { prototypeAssets, prototypeText } from "../../data/prototypeContent";
+import { prototypeText } from "../../data/prototypeContent";
 import { CubeScenePlaceholder } from "../three/CubeScenePlaceholder";
 import { cubeSceneTheme } from "../three/cubeSceneTheme";
 import { AiChatSortPanel } from "./AiChatSortPanel";
 import { AnimatedButton } from "../ui/AnimatedButton";
 import { ArrowGlyph } from "../ui/ArrowGlyph";
-import { GlassIconButton } from "../ui/GlassIconButton";
 
 type SearchScreenProps = {
   onOpenStoryDetail: () => void;
@@ -27,6 +26,45 @@ function getOrbitStatWidthClass(id: string) {
 
   return "w-[79px]";
 }
+
+const cubeMapTopNavItems = [
+  {
+    label: "Cube 영역",
+    iconSrc: "/assets/figma/nav-icon-cube-area.svg",
+    nodeId: "1897:867",
+    isActive: true,
+  },
+  {
+    label: "차",
+    iconSrc: "/assets/figma/nav-icon-car.svg",
+    nodeId: "1897:871",
+    isActive: false,
+  },
+  {
+    label: "로봇",
+    iconSrc: "/assets/figma/nav-icon-robot.svg",
+    nodeId: "1897:875",
+    isActive: false,
+  },
+  {
+    label: "자율주행",
+    iconSrc: "/assets/figma/nav-icon-autonomous.svg",
+    nodeId: "1897:879",
+    isActive: false,
+  },
+  {
+    label: "피지컬AI",
+    iconSrc: "/assets/figma/nav-icon-physical-ai.svg",
+    nodeId: "1897:883",
+    isActive: false,
+  },
+  {
+    label: "미래고객",
+    iconSrc: "/assets/figma/nav-icon-future-customer.svg",
+    nodeId: "1897:907",
+    isActive: false,
+  },
+] as const;
 
 export function SearchScreen({ onOpenStoryDetail, isActive = true }: SearchScreenProps) {
   const [chatSortRequest, setChatSortRequest] = useState<AiChatSortRequest | null>(null);
@@ -154,47 +192,28 @@ export function SearchScreen({ onOpenStoryDetail, isActive = true }: SearchScree
       ) : (
         <>
           <nav
-            className="absolute left-[var(--viewport-center-x)] top-[calc(var(--safe-top)+44px)] z-10 flex h-[66px] w-[397.46px] max-w-[calc(var(--viewport-width)-32px)] -translate-x-1/2 rounded-full p-[6px] backdrop-blur-[70px]"
-            data-node-id="15:93"
+            className="cube-top-bar-scroll absolute left-[var(--viewport-center-x)] top-[calc(var(--safe-top)+44px)] z-10 w-max max-w-[calc(var(--viewport-width)-32px)] -translate-x-1/2 overflow-x-auto rounded-full bg-[rgba(196,196,196,0.2)] p-[6px] backdrop-blur-[35px] [scrollbar-width:none]"
+            data-node-id="1897:865"
             data-name="nav/cube-view-top-bar"
             aria-label="Cube View top menu"
           >
-            <div className="flex w-full items-center justify-center gap-[5.49px]">
-              <div
-                className="flex h-[54px] w-[177px] items-center justify-center gap-[6px] rounded-[40.23px] bg-[#2c2c2d] px-[20px] py-[12px] text-white backdrop-blur-[36.57px]"
-                data-node-id="15:95"
-                data-name="nav/current-view-tab - Cube View"
-              >
-                <img src={prototypeAssets.cubeViewIcon} alt="" className="h-[24px] w-[24px]" />
-                <span className="whitespace-nowrap text-[22px] font-medium leading-[1.5] tracking-[-0.22px]">
-                  {prototypeText.currentView}
-                </span>
-              </div>
-
-              <GlassIconButton
-                iconSrc={prototypeAssets.personIcon}
-                label="Profile"
-                variant="light"
-                className="!h-[54px] !w-[64px] border-0"
-                nodeId="15:99"
-                dataName="nav/icon-button - profile"
-              />
-              <GlassIconButton
-                iconSrc={prototypeAssets.secondaryIcon01}
-                label="Secondary action 1"
-                variant="light"
-                className="!h-[54px] !w-[64px] border-0"
-                nodeId="15:101"
-                dataName="nav/icon-button - secondary-action-01"
-              />
-              <GlassIconButton
-                iconSrc={prototypeAssets.secondaryIcon02}
-                label="Secondary action 2"
-                variant="light"
-                className="!h-[54px] !w-[64px] border-0"
-                nodeId="15:104"
-                dataName="nav/icon-button - secondary-action-02"
-              />
+            <div className="flex w-max items-center justify-center gap-[5.486px]">
+              {cubeMapTopNavItems.map((item) => (
+                <div
+                  key={item.label}
+                  className={`flex h-[54px] shrink-0 items-center justify-center gap-[6px] rounded-[40.229px] px-[20px] py-[12px] backdrop-blur-[18.286px] ${
+                    item.isActive ? "bg-[#2c2c2d] text-white" : "bg-white text-[#2c2c2d]"
+                  }`}
+                  data-node-id={item.nodeId}
+                  data-name={`nav/cube-map-top-bar-${item.label}`}
+                  aria-current={item.isActive ? "page" : undefined}
+                >
+                  <img src={item.iconSrc} alt="" className="h-[24px] w-[24px]" />
+                  <span className="whitespace-nowrap text-[22px] font-medium leading-[1.5] tracking-[-0.22px]">
+                    {item.label}
+                  </span>
+                </div>
+              ))}
             </div>
           </nav>
 
