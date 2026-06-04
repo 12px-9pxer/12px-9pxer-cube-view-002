@@ -29,39 +29,28 @@ function getOrbitStatWidthClass(id: string) {
 
 const cubeMapTopNavItems = [
   {
-    label: "Cube 영역",
-    iconSrc: "/assets/figma/nav-icon-cube-area.svg",
-    nodeId: "1897:867",
+    label: "Cube View",
+    iconSrc: "/assets/figma/nav-1929-cube-view-symbol.svg",
+    nodeId: "1929:1060",
+    dataName: "nav/current-view-tab - Cube View",
     isActive: true,
   },
   {
-    label: "차",
-    iconSrc: "/assets/figma/nav-icon-car.svg",
-    nodeId: "1897:871",
+    iconSrc: "/assets/figma/nav-1929-person-fill.svg",
+    nodeId: "1929:1064",
+    dataName: "nav/icon-button - profile",
     isActive: false,
   },
   {
-    label: "로봇",
-    iconSrc: "/assets/figma/nav-icon-robot.svg",
-    nodeId: "1897:875",
+    iconSrc: "/assets/figma/nav-1929-secondary-action-01.svg",
+    nodeId: "1929:1066",
+    dataName: "nav/icon-button - secondary-action-01",
     isActive: false,
   },
   {
-    label: "자율주행",
-    iconSrc: "/assets/figma/nav-icon-autonomous.svg",
-    nodeId: "1897:879",
-    isActive: false,
-  },
-  {
-    label: "피지컬AI",
-    iconSrc: "/assets/figma/nav-icon-physical-ai.svg",
-    nodeId: "1897:883",
-    isActive: false,
-  },
-  {
-    label: "미래고객",
-    iconSrc: "/assets/figma/nav-icon-future-customer.svg",
-    nodeId: "1897:907",
+    iconSrc: "/assets/figma/nav-1929-secondary-action-02.svg",
+    nodeId: "1929:1069",
+    dataName: "nav/icon-button - secondary-action-02",
     isActive: false,
   },
 ] as const;
@@ -70,6 +59,7 @@ export function SearchScreen({ onOpenStoryDetail, isActive = true }: SearchScree
   const [chatSortRequest, setChatSortRequest] = useState<AiChatSortRequest | null>(null);
   const [chatPanelResetId, setChatPanelResetId] = useState(0);
   const [exitOrbitViewRequestId, setExitOrbitViewRequestId] = useState(0);
+  const [areAxisIndexesVisible, setAreAxisIndexesVisible] = useState(false);
   const [isOrbitView, setIsOrbitView] = useState(false);
   const [isParallaxViewEnabled, setIsParallaxViewEnabled] = useState<boolean>(
     () => cubeSceneTheme.orbitView.parallax.defaultEnabled,
@@ -105,6 +95,7 @@ export function SearchScreen({ onOpenStoryDetail, isActive = true }: SearchScree
         sceneActive={isActive}
         chatSortRequest={chatSortRequest}
         exitOrbitViewRequestId={exitOrbitViewRequestId}
+        axisIndexesVisible={areAxisIndexesVisible}
         parallaxViewEnabled={isActive && isOrbitView && isParallaxViewEnabled}
         onOrbitViewChange={setIsOrbitView}
         onParallaxViewUnavailable={() => setIsParallaxViewEnabled(false)}
@@ -192,26 +183,28 @@ export function SearchScreen({ onOpenStoryDetail, isActive = true }: SearchScree
       ) : (
         <>
           <nav
-            className="cube-top-bar-scroll absolute left-[var(--viewport-center-x)] top-[calc(var(--safe-top)+44px)] z-10 w-max max-w-[calc(var(--viewport-width)-32px)] -translate-x-1/2 overflow-x-auto rounded-full bg-[rgba(196,196,196,0.2)] p-[6px] backdrop-blur-[35px] [scrollbar-width:none]"
-            data-node-id="1897:865"
+            className="cube-top-bar-scroll absolute left-[var(--viewport-center-x)] top-[calc(var(--safe-top)+44px)] z-10 w-max max-w-[calc(var(--viewport-width)-32px)] -translate-x-1/2 overflow-x-auto rounded-full p-[6px] backdrop-blur-[35px] [scrollbar-width:none]"
+            data-node-id="1929:1058"
             data-name="nav/cube-view-top-bar"
             aria-label="Cube View top menu"
           >
             <div className="flex w-max items-center justify-center gap-[5.486px]">
               {cubeMapTopNavItems.map((item) => (
                 <div
-                  key={item.label}
-                  className={`flex h-[54px] shrink-0 items-center justify-center gap-[6px] rounded-[40.229px] px-[20px] py-[12px] backdrop-blur-[18.286px] ${
+                  key={item.nodeId}
+                  className={`flex h-[54px] shrink-0 items-center justify-center rounded-[40.229px] px-[20px] py-[12px] backdrop-blur-[18.286px] ${
                     item.isActive ? "bg-[#2c2c2d] text-white" : "bg-white text-[#2c2c2d]"
-                  }`}
+                  } ${item.isActive ? "gap-[6px]" : ""}`}
                   data-node-id={item.nodeId}
-                  data-name={`nav/cube-map-top-bar-${item.label}`}
+                  data-name={item.dataName}
                   aria-current={item.isActive ? "page" : undefined}
                 >
                   <img src={item.iconSrc} alt="" className="h-[24px] w-[24px]" />
-                  <span className="whitespace-nowrap text-[22px] font-medium leading-[1.5] tracking-[-0.22px]">
-                    {item.label}
-                  </span>
+                  {"label" in item ? (
+                    <span className="whitespace-nowrap text-[22px] font-medium leading-[1.5] tracking-[-0.22px]">
+                      {item.label}
+                    </span>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -220,6 +213,10 @@ export function SearchScreen({ onOpenStoryDetail, isActive = true }: SearchScree
           <AiChatSortPanel
             key={chatPanelResetId}
             onSortStageComplete={handleSortStageComplete}
+            onToggleAxisIndexes={() =>
+              setAreAxisIndexesVisible((isVisible) => !isVisible)
+            }
+            onOpenStoryDetailCommand={onOpenStoryDetail}
           />
         </>
       )}

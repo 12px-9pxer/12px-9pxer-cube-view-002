@@ -11,6 +11,7 @@ type CubeScenePlaceholderProps = {
   chatSortRequest?: AiChatSortRequest | null;
   highlightRequestId?: number;
   exitOrbitViewRequestId?: number;
+  axisIndexesVisible?: boolean;
   parallaxViewEnabled?: boolean;
   onOrbitViewChange?: (isOrbitView: boolean) => void;
   onParallaxViewUnavailable?: (reason: ParallaxUnavailableReason) => void;
@@ -23,6 +24,7 @@ export function CubeScenePlaceholder({
   chatSortRequest = null,
   highlightRequestId = 0,
   exitOrbitViewRequestId = 0,
+  axisIndexesVisible = false,
   parallaxViewEnabled = false,
   onOrbitViewChange,
   onParallaxViewUnavailable,
@@ -53,6 +55,7 @@ export function CubeScenePlaceholder({
           chatSortRequest={chatSortRequest}
           highlightRequestId={highlightRequestId}
           exitOrbitViewRequestId={exitOrbitViewRequestId}
+          axisIndexesVisible={axisIndexesVisible}
           sceneActive={sceneActive}
           parallaxViewEnabled={parallaxViewEnabled}
           onOrbitViewChange={onOrbitViewChange}

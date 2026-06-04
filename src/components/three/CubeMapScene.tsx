@@ -593,6 +593,37 @@ function createAxisGuideLineSegments(
   return lineSegments;
 }
 
+function createAxisGuideArrowHead(
+  point: THREE.Vector3,
+  direction: THREE.Vector3,
+  {
+    color,
+    opacity,
+    radius,
+    length,
+  }: {
+    color: THREE.ColorRepresentation;
+    opacity: number;
+    radius: number;
+    length: number;
+  },
+) {
+  const normalizedDirection = direction.clone().normalize();
+  const geometry = new THREE.ConeGeometry(radius, length, 24);
+  const material = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity,
+    depthTest: true,
+    depthWrite: false,
+  });
+  const arrowHead = new THREE.Mesh(geometry, material);
+  arrowHead.position.copy(point).add(normalizedDirection.multiplyScalar(length * 0.5));
+  arrowHead.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize());
+
+  return arrowHead;
+}
+
 function createAxisGuideGroup() {
   const { axisGuide } = cubeSceneTheme;
   const group = new THREE.Group();
@@ -600,6 +631,8 @@ function createAxisGuideGroup() {
   const origin = new THREE.Vector3(GRID_MIN, GRID_MIN, GRID_MIN);
   const lineSegments: THREE.Vector3[] = [];
   const tickSegments: THREE.Vector3[] = [];
+  const indexesGroup = new THREE.Group();
+  indexesGroup.name = "axis-indexes";
   const axes = [
     {
       id: "x",
@@ -633,6 +666,14 @@ function createAxisGuideGroup() {
   axes.forEach((axis) => {
     const endPoint = origin.clone().add(axis.direction.clone().multiplyScalar(axisLength));
     lineSegments.push(origin.clone(), endPoint.clone());
+    group.add(
+      createAxisGuideArrowHead(endPoint, axis.direction, {
+        color: axisGuide.lineColor,
+        opacity: axisGuide.lineOpacity,
+        radius: axisGuide.arrowRadius,
+        length: axisGuide.arrowLength,
+      }),
+    );
 
     axis.values.forEach((value, index) => {
       const progress = axis.values.length <= 1 ? 0 : index / (axis.values.length - 1);
@@ -656,7 +697,7 @@ function createAxisGuideGroup() {
         fontFamily: axisGuide.fontFamily,
       });
       label.position.copy(point.clone().add(axis.labelOffset));
-      group.add(label);
+      indexesGroup.add(label);
     });
 
     const title = createAxisGuideTextSprite(axis.title, {
@@ -680,13 +721,14 @@ function createAxisGuideGroup() {
       axisGuide.lineOpacity,
     ),
   );
-  group.add(
+  indexesGroup.add(
     createAxisGuideLineSegments(
       tickSegments,
       axisGuide.tickColor,
       axisGuide.tickOpacity,
     ),
   );
+  group.add(indexesGroup);
 
   return group;
 }
@@ -839,6 +881,7 @@ type CubeMapSceneProps = {
   chatSortRequest?: AiChatSortRequest | null;
   highlightRequestId?: number;
   exitOrbitViewRequestId?: number;
+  axisIndexesVisible?: boolean;
   sceneActive?: boolean;
   parallaxViewEnabled?: boolean;
   onOrbitViewChange?: (isOrbitView: boolean) => void;
@@ -853,6 +896,7 @@ export default function CubeMapScene({
   chatSortRequest = null,
   highlightRequestId = 0,
   exitOrbitViewRequestId = 0,
+  axisIndexesVisible = false,
   sceneActive = true,
   parallaxViewEnabled = false,
   onOrbitViewChange,
@@ -870,6 +914,7 @@ export default function CubeMapScene({
   const sceneReadyRef = useRef(onSceneReady);
   const sceneActiveRef = useRef(sceneActive);
   const parallaxViewEnabledRef = useRef(parallaxViewEnabled);
+  const axisIndexesVisibleRef = useRef(axisIndexesVisible);
   const pendingChatSortRequestRef = useRef<AiChatSortRequest | null>(null);
   const pendingHighlightRequestIdRef = useRef(0);
 
@@ -888,6 +933,10 @@ export default function CubeMapScene({
   useEffect(() => {
     sceneActiveRef.current = sceneActive;
   }, [sceneActive]);
+
+  useEffect(() => {
+    axisIndexesVisibleRef.current = axisIndexesVisible;
+  }, [axisIndexesVisible]);
 
   useEffect(() => {
     openStoryDetailRef.current = onOpenStoryDetail;
@@ -1071,6 +1120,8 @@ export default function CubeMapScene({
     axisGuideScene.fog = scene.fog;
     const axisDepthScene = new THREE.Scene();
     const axisGuideGroup = createAxisGuideGroup();
+    const axisIndexesGroup = axisGuideGroup.getObjectByName("axis-indexes");
+    axisIndexesGroup.visible = axisIndexesVisibleRef.current;
     axisGuideScene.add(axisGuideGroup);
 
     const nodesGroup = new THREE.Group();
@@ -2428,9 +2479,11 @@ export default function CubeMapScene({
           gridPlane.visible = false;
         });
         axisGuideGroup.visible = false;
+        axisIndexesGroup.visible = false;
         axisDepthOccludersGroup.visible = false;
       } else {
         axisGuideGroup.visible = true;
+        axisIndexesGroup.visible = axisIndexesVisibleRef.current;
         axisDepthOccludersGroup.visible = true;
         updateGridPlaneVisibility(
           gridPlanes,

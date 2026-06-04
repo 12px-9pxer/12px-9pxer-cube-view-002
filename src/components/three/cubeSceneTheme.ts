@@ -204,6 +204,8 @@ export const cubeSceneTheme = {
     lineOpacity: 0.58,
     tickOpacity: 0.5,
     axisPadding: 18,
+    arrowLength: 4.2,
+    arrowRadius: 1.1,
     tickLength: 3.8,
     labelOffset: 7,
     titleOffset: 12,
@@ -221,24 +223,7 @@ export const cubeSceneTheme = {
     labelBorderColor: "rgba(255, 255, 255, 0.8)",
     axes: {
       x: {
-        title: "차량 라인업",
-        values: [
-          "캐스퍼",
-          "모닝",
-          "레이",
-          "아반떼",
-          "K3",
-          "코나",
-          "니로",
-          "EV3",
-          "아이오닉 6",
-          "스포티지",
-          "투싼",
-          "K5",
-        ],
-      },
-      y: {
-        title: "피쳐",
+        title: "Feature",
         values: [
           "파워트레인",
           "배터리·항속거리",
@@ -254,8 +239,25 @@ export const cubeSceneTheme = {
           "V2X·자율주행",
         ],
       },
+      y: {
+        title: "Hardware",
+        values: [
+          "캐스퍼",
+          "모닝",
+          "레이",
+          "아반떼",
+          "K3",
+          "코나",
+          "니로",
+          "EV3",
+          "아이오닉 6",
+          "스포티지",
+          "투싼",
+          "K5",
+        ],
+      },
       z: {
-        title: "유저 스토리",
+        title: "User Story",
         values: [
           "워킹맘",
           "신혼부부",

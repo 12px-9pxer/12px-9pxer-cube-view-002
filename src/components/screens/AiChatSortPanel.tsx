@@ -14,8 +14,13 @@ type AiChatMessage = {
   status: "done" | "thinking" | "typing";
 };
 
+const AXIS_INDEX_TOGGLE_COMMAND = "\uC778\uB371\uC2A4";
+const STORY_DETAIL_COMMAND = "\uC2A4\uD1A0\uB9AC";
+
 type AiChatSortPanelProps = {
   onSortStageComplete: (stage: AiChatSortStage) => void;
+  onToggleAxisIndexes?: () => void;
+  onOpenStoryDetailCommand?: () => void;
 };
 
 function AiSparkleIcon() {
@@ -109,7 +114,11 @@ function ChatBubble({ message }: { message: AiChatMessage }) {
   );
 }
 
-export function AiChatSortPanel({ onSortStageComplete }: AiChatSortPanelProps) {
+export function AiChatSortPanel({
+  onSortStageComplete,
+  onToggleAxisIndexes,
+  onOpenStoryDetailCommand,
+}: AiChatSortPanelProps) {
   const [messages, setMessages] = useState<AiChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [completedStages, setCompletedStages] = useState(0);
@@ -288,7 +297,23 @@ export function AiChatSortPanel({ onSortStageComplete }: AiChatSortPanelProps) {
   const submitMessage = (messageText: string) => {
     const trimmedMessage = messageText.trim();
 
-    if (!trimmedMessage || isResponding || completedStages >= aiChatSortConfig.aiReplies.length) {
+    if (!trimmedMessage || isResponding) {
+      return;
+    }
+
+    if (trimmedMessage === AXIS_INDEX_TOGGLE_COMMAND) {
+      setInputValue("");
+      onToggleAxisIndexes?.();
+      return;
+    }
+
+    if (trimmedMessage === STORY_DETAIL_COMMAND) {
+      setInputValue("");
+      onOpenStoryDetailCommand?.();
+      return;
+    }
+
+    if (completedStages >= aiChatSortConfig.aiReplies.length) {
       return;
     }
 
@@ -353,7 +378,12 @@ export function AiChatSortPanel({ onSortStageComplete }: AiChatSortPanelProps) {
   };
 
   const isComplete = completedStages >= aiChatSortConfig.aiReplies.length;
-  const isInputDisabled = isResponding || isComplete;
+  const trimmedInputValue = inputValue.trim();
+  const isIndexCommand = trimmedInputValue === AXIS_INDEX_TOGGLE_COMMAND;
+  const isStoryDetailCommand = trimmedInputValue === STORY_DETAIL_COMMAND;
+  const isInputDisabled = isResponding;
+  const isSubmitDisabled =
+    isResponding || !trimmedInputValue || (isComplete && !isIndexCommand && !isStoryDetailCommand);
   const hasQuickPrompts = aiChatSortConfig.quickPrompts.length > 0;
 
   return (
@@ -422,7 +452,7 @@ export function AiChatSortPanel({ onSortStageComplete }: AiChatSortPanelProps) {
             </label>
             <AnimatedButton
               type="submit"
-              disabled={isInputDisabled || !inputValue.trim()}
+              disabled={isSubmitDisabled}
               className="flex h-[54px] w-[85.54px] shrink-0 items-center justify-center rounded-full bg-[#2c2c2d] px-[23.771px] py-[7.314px] text-white backdrop-blur-[9.143px] disabled:cursor-default disabled:opacity-45"
               data-name="button_enter"
               aria-label="Send message"
