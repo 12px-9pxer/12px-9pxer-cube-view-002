@@ -18,6 +18,7 @@ import {
   prototypeAssets,
   type CommentItem,
   type PollOptionId,
+  type ReactionId,
   type ScreenId,
 } from "./data/prototypeContent";
 import {
@@ -47,7 +48,7 @@ const screenBackgrounds: Record<
     src: null,
   },
   detail: {
-    src: prototypeAssets.detailBg,
+    src: null,
   },
 };
 
@@ -76,6 +77,36 @@ function preloadImage(src: string | null) {
   });
 }
 
+function preloadVideo(src: string | null) {
+  if (!src || typeof document === "undefined") {
+    return Promise.resolve();
+  }
+
+  return new Promise<void>((resolve) => {
+    const video = document.createElement("video");
+    let isResolved = false;
+
+    const resolveOnce = () => {
+      if (isResolved) {
+        return;
+      }
+
+      isResolved = true;
+      video.removeEventListener("loadeddata", resolveOnce);
+      video.removeEventListener("error", resolveOnce);
+      resolve();
+    };
+
+    video.preload = "auto";
+    video.muted = true;
+    video.playsInline = true;
+    video.addEventListener("loadeddata", resolveOnce);
+    video.addEventListener("error", resolveOnce);
+    video.src = src;
+    video.load();
+  });
+}
+
 export default function App() {
   const [screen, setScreen] = useState<ScreenId>("landing");
   const [loadingOverlay, setLoadingOverlay] = useState<LoadingOverlayState>({
@@ -84,6 +115,8 @@ export default function App() {
   });
   const [selectedPollOption, setSelectedPollOption] = useState<PollOptionId | null>(null);
   const [isPollSubmitted, setIsPollSubmitted] = useState(false);
+  const [empathyCount, setEmpathyCount] = useState(460);
+  const [hasIncrementedEmpathy, setHasIncrementedEmpathy] = useState(false);
   const [comments, setComments] = useState<CommentItem[]>(() => {
     const initialCommentStackPositions = getInitialCommentStackPositions(2);
 
@@ -100,6 +133,7 @@ export default function App() {
   const isLoadingOverlayActiveRef = useRef(true);
   const loadingOverlayExitTimerRef = useRef<number | null>(null);
   const commentsRef = useRef(comments);
+  const hasIncrementedEmpathyRef = useRef(false);
   const inertiaFrameRef = useRef<number | null>(null);
   const background = screenBackgrounds[screen];
 
@@ -147,11 +181,11 @@ export default function App() {
   }, []);
 
   const runLoadingGate = useCallback(
-    async (imageSrc: string | null) => {
+    async (preloadMedia: () => Promise<void>) => {
       showLoadingOverlay();
 
       await Promise.all([
-        preloadImage(imageSrc),
+        preloadMedia(),
         wait(prototypeParams.loading.minimumDurationMs),
       ]);
 
@@ -418,6 +452,16 @@ export default function App() {
     setIsPollSubmitted(true);
   };
 
+  const sendReaction = (_reactionId: ReactionId) => {
+    if (hasIncrementedEmpathyRef.current) {
+      return;
+    }
+
+    hasIncrementedEmpathyRef.current = true;
+    setEmpathyCount((currentCount) => currentCount + 1);
+    setHasIncrementedEmpathy(true);
+  };
+
   const goToScreen = useCallback((nextScreen: ScreenId) => {
     const currentScreen = activeScreenRef.current;
 
@@ -467,7 +511,7 @@ export default function App() {
       return;
     }
 
-    await runLoadingGate(prototypeAssets.detailBg);
+    await runLoadingGate(() => preloadVideo(prototypeAssets.storyDetailVideo));
     goToScreen("detail");
   }, [goToScreen, runLoadingGate]);
 
@@ -492,10 +536,13 @@ export default function App() {
         {screen === "detail" ? (
           <DetailScreen
             comments={comments}
+            empathyCount={empathyCount}
             selectedPollOption={selectedPollOption}
             isPollSubmitted={isPollSubmitted}
+            hasIncrementedEmpathy={hasIncrementedEmpathy}
             onBackToSearch={() => goToScreen("search")}
             onSelectPollOption={selectPollOption}
+            onSendReaction={sendReaction}
             onAddComment={addComment}
             onMoveComment={moveComment}
             onSettleComment={settleComment}

@@ -13,6 +13,14 @@ export type PrototypeAssetKey =
   | "landingBg"
   | "searchBg"
   | "detailBg"
+  | "storyDetailVideo"
+  | "storySelectorHudBefore"
+  | "storySelectorHudAfter"
+  | "storySelectorMissionBox"
+  | "storySelectorButtonADefault"
+  | "storySelectorButtonASelect"
+  | "storySelectorButtonBDefault"
+  | "storySelectorButtonBSelect"
   | "cubeViewIcon"
   | "personIcon"
   | "secondaryIcon01"
@@ -22,7 +30,9 @@ export type PrototypeAssetKey =
   | "storyActionRightIcon"
   | "radioEmptyIcon"
   | "engineerAvatar"
-  | "floatingChatReference";
+  | "floatingChatReference"
+  | "storyDetailExtraFrame01"
+  | "storyDetailExtraFrame02";
 
 export type CommentItem = {
   id: string;
@@ -58,6 +68,14 @@ export const prototypeAssets: Record<PrototypeAssetKey, string> = {
   landingBg: "/assets/figma/landing-bg.png",
   searchBg: "/assets/figma/search-bg.png",
   detailBg: "/assets/figma/detail-bg.png",
+  storyDetailVideo: "/assets/figma/S2C3.mp4",
+  storySelectorHudBefore: "/assets/figma/selector/Mom%20HUD_before.png",
+  storySelectorHudAfter: "/assets/figma/selector/Mom%20HUD_after.png",
+  storySelectorMissionBox: "/assets/figma/selector/Mission%20Text%20Box.png",
+  storySelectorButtonADefault: "/assets/figma/selector/Button%20A_default.png",
+  storySelectorButtonASelect: "/assets/figma/selector/Button%20A_select.png",
+  storySelectorButtonBDefault: "/assets/figma/selector/Button%20B_default.png",
+  storySelectorButtonBSelect: "/assets/figma/selector/Button%20B_select.png",
   cubeViewIcon: "/assets/figma/icon-cube-view.svg",
   personIcon: "/assets/figma/icon-person.svg",
   secondaryIcon01: "/assets/figma/icon-secondary-01.svg",
@@ -68,6 +86,8 @@ export const prototypeAssets: Record<PrototypeAssetKey, string> = {
   radioEmptyIcon: "/assets/figma/icon-radio-empty.svg",
   engineerAvatar: "/assets/figma/avatar-engineer.png",
   floatingChatReference: "/assets/figma/floating-chat-reference.png",
+  storyDetailExtraFrame01: "/assets/figma/story-detail-extra-frame-01.png",
+  storyDetailExtraFrame02: "/assets/figma/story-detail-extra-frame-02.png",
 };
 
 export const prototypeText = {

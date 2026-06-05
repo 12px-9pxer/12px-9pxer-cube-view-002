@@ -44,6 +44,23 @@ input {
   font: inherit;
 }
 
+.landing-access-code-input::-ms-reveal,
+.landing-access-code-input::-ms-clear {
+  display: none;
+}
+
+.landing-access-code-input::-webkit-credentials-auto-fill-button,
+.landing-access-code-input::-webkit-contacts-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+  pointer-events: none;
+}
+
+.landing-access-code-input--masked {
+  -webkit-text-security: disc;
+  text-security: disc;
+}
+
 button {
   cursor: pointer;
 }
@@ -320,6 +337,127 @@ button {
   display: none;
 }
 
+.story-detail-scroll-shell {
+  scrollbar-width: none;
+}
+
+.story-detail-scroll-shell--locked {
+  overflow: hidden !important;
+}
+
+.story-detail-scroll-shell::-webkit-scrollbar {
+  display: none;
+}
+
+.story-detail-scroll-shell img {
+  pointer-events: none;
+}
+
+.story-detail-video-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.story-choice-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.story-community-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.story-community-layer > * {
+  pointer-events: auto;
+}
+
+.story-mission-image-card {
+  position: absolute;
+  top: calc(var(--viewport-center-y) - 143px);
+  left: calc(var(--viewport-center-x) - 346.5px);
+  width: 693px;
+  height: 286px;
+  pointer-events: auto;
+}
+
+.story-mission-image-card-asset {
+  display: block;
+  width: 693px;
+  height: 286px;
+  user-select: none;
+  pointer-events: none;
+}
+
+.story-selector-choice-button {
+  position: absolute;
+  top: 143px;
+  width: 300px;
+  height: 102px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  appearance: none;
+}
+
+.story-selector-choice-button:focus-visible {
+  outline: 3px solid rgb(0 108 255 / 54%);
+  outline-offset: -6px;
+}
+
+.story-selector-choice-button:disabled {
+  cursor: default;
+}
+
+.story-selector-choice-button-a {
+  left: 32px;
+}
+
+.story-selector-choice-button-b {
+  left: 360px;
+}
+
+.story-selector-choice-button-asset {
+  display: block;
+  width: 300px;
+  height: 102px;
+  user-select: none;
+  pointer-events: none;
+}
+
+.story-mom-hud {
+  position: absolute;
+  top: 150px;
+  left: 44px;
+  z-index: 35;
+  display: block;
+  width: 264px;
+  height: 150px;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+.story-detail-extra-action-hitarea {
+  min-width: 54px;
+  min-height: 28px;
+}
+
+.story-detail-empathy-previous::before {
+  content: attr(data-previous-value);
+}
+
 .text-crisp {
   -webkit-font-smoothing: antialiased;
   text-rendering: geometricPrecision;
@@ -344,6 +482,13 @@ button {
   .page3-poll-card {
     top: calc(var(--safe-top) + 112px) !important;
     bottom: auto !important;
+  }
+
+  .story-mom-hud {
+    top: calc(var(--safe-top) + 112px);
+    left: 16px;
+    transform-origin: top left;
+    scale: 0.86;
   }
 
 }
