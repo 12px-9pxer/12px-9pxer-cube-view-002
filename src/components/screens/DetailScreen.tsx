@@ -19,7 +19,7 @@ import { ReactionBar } from "../ui/ReactionBar";
 
 gsap.registerPlugin(Observer);
 
-const STORY_EXTRA_ACTION_URL = "https://naver.com";
+const STORY_EXTRA_ACTION_URL = "https://carousel-eta-silk.vercel.app/";
 const STORY_SCROLL_RELEASE_DELTA = 340;
 const STORY_SCROLL_RESISTANCE_Y = 34;
 const STORY_SCROLL_RESET_DELAY_MS = 140;
