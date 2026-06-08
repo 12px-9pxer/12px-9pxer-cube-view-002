@@ -59,14 +59,18 @@ export function PollCard({
 
     const enterTween = gsap.fromTo(
       cardElement,
-      { "--gui-motion-scale": 0 },
+      { autoAlpha: 0, y: 14 },
       {
-        "--gui-motion-scale": 1,
+        autoAlpha: 1,
+        y: 0,
         delay: page3Motion.pollEnterDelay,
         duration: page3Motion.pollEnterDuration,
         ease: page3Motion.pollEnterEase,
         force3D: true,
         overwrite: "auto",
+        onComplete: () => {
+          gsap.set(cardElement, { clearProps: "transform" });
+        },
       },
     );
 
