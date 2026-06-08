@@ -23,6 +23,9 @@ const STORY_EXTRA_ACTION_URL = "https://carousel-eta-silk.vercel.app/";
 const STORY_SCROLL_RELEASE_DELTA = 340;
 const STORY_SCROLL_RESISTANCE_Y = 34;
 const STORY_SCROLL_RESET_DELAY_MS = 140;
+const STORY_EXTRA_SCROLL_RELEASE_DELTA = 220;
+const STORY_EXTRA_SCROLL_TRIGGER_DELTA = 110;
+const STORY_EXTRA_SCROLL_RESISTANCE_Y = 26;
 const STORY_CHOICE_REVEAL_DELAY_MS = 260;
 
 type StoryIntroPhase = "video" | "choice" | "revealed";
@@ -277,8 +280,11 @@ export function DetailScreen({
   const [selectedIntroChoice, setSelectedIntroChoice] = useState<StoryChoiceId | null>(
     null,
   );
+  const [isExtraFrameTransitionActive, setIsExtraFrameTransitionActive] =
+    useState(false);
   const scrollShellRef = useRef<HTMLDivElement>(null);
   const firstSectionRef = useRef<HTMLDivElement>(null);
+  const extraFrameTransitionRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const choiceOverlayRef = useRef<HTMLDivElement>(null);
   const communityLayerRef = useRef<HTMLDivElement>(null);
@@ -404,6 +410,59 @@ export function DetailScreen({
       if (choiceRevealTimerRef.current !== null) {
         window.clearTimeout(choiceRevealTimerRef.current);
       }
+    };
+  }, []);
+
+  useEffect(() => {
+    const scrollShell = scrollShellRef.current;
+    const transitionFrame = extraFrameTransitionRef.current;
+
+    if (!scrollShell || !transitionFrame) {
+      return;
+    }
+
+    let animationFrame: number | null = null;
+
+    const updateTransitionState = () => {
+      animationFrame = null;
+
+      const scrollShellRect = scrollShell.getBoundingClientRect();
+      const transitionFrameRect = transitionFrame.getBoundingClientRect();
+      const transitionFrameTop =
+        scrollShell.scrollTop + transitionFrameRect.top - scrollShellRect.top;
+      const triggerOffset = Math.max(
+        Math.min(scrollShell.clientHeight, transitionFrame.clientHeight) * 0.16,
+        1,
+      );
+      const shouldActivateTransition =
+        scrollShell.scrollTop >= transitionFrameTop + triggerOffset;
+
+      setIsExtraFrameTransitionActive(
+        (isActive) => isActive || shouldActivateTransition,
+      );
+    };
+
+    const requestTransitionStateUpdate = () => {
+      if (animationFrame !== null) {
+        return;
+      }
+
+      animationFrame = window.requestAnimationFrame(updateTransitionState);
+    };
+
+    updateTransitionState();
+    scrollShell.addEventListener("scroll", requestTransitionStateUpdate, {
+      passive: true,
+    });
+    window.addEventListener("resize", requestTransitionStateUpdate);
+
+    return () => {
+      if (animationFrame !== null) {
+        window.cancelAnimationFrame(animationFrame);
+      }
+
+      scrollShell.removeEventListener("scroll", requestTransitionStateUpdate);
+      window.removeEventListener("resize", requestTransitionStateUpdate);
     };
   }, []);
 
@@ -539,6 +598,162 @@ export function DetailScreen({
       scrollShell.removeEventListener("scroll", resetScrollResistanceAtTop);
       observer.kill();
       gsap.killTweensOf([scrollShell, firstSection]);
+    };
+  }, [isCommunityUnlocked]);
+
+  useEffect(() => {
+    const scrollShell = scrollShellRef.current;
+    const transitionFrame = extraFrameTransitionRef.current;
+
+    if (!isCommunityUnlocked || !scrollShell || !transitionFrame) {
+      if (transitionFrame) {
+        gsap.killTweensOf(transitionFrame);
+        gsap.set(transitionFrame, { y: 0 });
+      }
+
+      return;
+    }
+
+    let isReleased = false;
+    let accumulatedDelta = 0;
+    let resetTimer: number | undefined;
+
+    const getTransitionFrameTop = () => {
+      const scrollShellRect = scrollShell.getBoundingClientRect();
+      const transitionFrameRect = transitionFrame.getBoundingClientRect();
+      const transitionFrameY = Number(gsap.getProperty(transitionFrame, "y")) || 0;
+
+      return (
+        scrollShell.scrollTop +
+        transitionFrameRect.top -
+        scrollShellRect.top -
+        transitionFrameY
+      );
+    };
+
+    const resetResistance = () => {
+      accumulatedDelta = 0;
+      gsap.to(transitionFrame, {
+        y: 0,
+        duration: 0.28,
+        ease: "elastic.out(1, 0.72)",
+        overwrite: "auto",
+      });
+    };
+
+    const scheduleReset = () => {
+      window.clearTimeout(resetTimer);
+      resetTimer = window.setTimeout(
+        resetResistance,
+        STORY_SCROLL_RESET_DELAY_MS,
+      );
+    };
+
+    const shouldIgnoreEvent = (event: Event) => {
+      if (isReleased) {
+        return true;
+      }
+
+      const target = event.target;
+
+      if (
+        target instanceof Element &&
+        target.closest(
+          ".page3-poll-card, .page3-comment-input, button, a, input, textarea, [data-story-scroll-ignore='true']",
+        )
+      ) {
+        return true;
+      }
+
+      const distanceFromTransitionTop =
+        scrollShell.scrollTop - getTransitionFrameTop();
+
+      return distanceFromTransitionTop < -2 || distanceFromTransitionTop > 3;
+    };
+
+    const resetScrollResistanceAtTransitionTop = () => {
+      const distanceFromTransitionTop =
+        scrollShell.scrollTop - getTransitionFrameTop();
+
+      if (isReleased && distanceFromTransitionTop < -2) {
+        isReleased = false;
+        accumulatedDelta = 0;
+        gsap.killTweensOf(transitionFrame);
+        gsap.set(transitionFrame, { y: 0 });
+        observer.enable();
+        return;
+      }
+
+      if (!isReleased && Math.abs(distanceFromTransitionTop) > 3) {
+        accumulatedDelta = 0;
+        gsap.killTweensOf(transitionFrame);
+        gsap.set(transitionFrame, { y: 0 });
+      }
+    };
+
+    const observer = Observer.create({
+      target: scrollShell,
+      type: "wheel,touch",
+      preventDefault: true,
+      allowClicks: true,
+      tolerance: 1,
+      ignoreCheck: shouldIgnoreEvent,
+      onChangeY: (self) => {
+        if (isReleased) {
+          return;
+        }
+
+        if (self.deltaY <= 0) {
+          scheduleReset();
+          return;
+        }
+
+        window.clearTimeout(resetTimer);
+        accumulatedDelta += self.deltaY;
+
+        if (accumulatedDelta >= STORY_EXTRA_SCROLL_TRIGGER_DELTA) {
+          setIsExtraFrameTransitionActive(true);
+        }
+
+        const progress = Math.min(
+          accumulatedDelta / STORY_EXTRA_SCROLL_RELEASE_DELTA,
+          1,
+        );
+
+        gsap.to(transitionFrame, {
+          y: -STORY_EXTRA_SCROLL_RESISTANCE_Y * progress,
+          duration: 0.16,
+          ease: "power2.out",
+          overwrite: "auto",
+        });
+
+        if (accumulatedDelta < STORY_EXTRA_SCROLL_RELEASE_DELTA) {
+          scheduleReset();
+          return;
+        }
+
+        isReleased = true;
+        observer.disable();
+
+        gsap.to(transitionFrame, {
+          y: 0,
+          duration: 0.42,
+          ease: "power3.out",
+          overwrite: "auto",
+        });
+      },
+    });
+
+    scrollShell.addEventListener("scroll", resetScrollResistanceAtTransitionTop, {
+      passive: true,
+    });
+
+    return () => {
+      window.clearTimeout(resetTimer);
+      scrollShell.removeEventListener("scroll", resetScrollResistanceAtTransitionTop);
+      observer.kill();
+      gsap.killTweensOf(transitionFrame);
+      gsap.set(transitionFrame, { y: 0 });
     };
   }, [isCommunityUnlocked]);
 
@@ -811,12 +1026,26 @@ export function DetailScreen({
           className="relative w-[var(--viewport-width)] bg-white"
           data-name="story-detail/extra-content-section"
         >
-          <img
-            src={prototypeAssets.storyDetailExtraFrame01}
-            alt=""
-            className="block h-auto w-full select-none"
-            draggable={false}
-          />
+          <div
+            ref={extraFrameTransitionRef}
+            className="story-detail-extra-frame-transition"
+            data-name="story-detail/extra-frame-transition"
+          >
+            <img
+              src={prototypeAssets.storyDetailExtraFrame01}
+              alt=""
+              className="story-detail-extra-frame-image"
+              draggable={false}
+            />
+            <img
+              src={prototypeAssets.storyDetailExtraFrame01Scroll}
+              alt=""
+              className="story-detail-extra-frame-overlay"
+              draggable={false}
+              data-transition-active={isExtraFrameTransitionActive}
+              aria-hidden="true"
+            />
+          </div>
           <div className="relative w-full">
             <img
               src={prototypeAssets.storyDetailExtraFrame02}

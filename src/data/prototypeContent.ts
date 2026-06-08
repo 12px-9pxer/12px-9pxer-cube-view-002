@@ -32,6 +32,7 @@ export type PrototypeAssetKey =
   | "engineerAvatar"
   | "floatingChatReference"
   | "storyDetailExtraFrame01"
+  | "storyDetailExtraFrame01Scroll"
   | "storyDetailExtraFrame02";
 
 export type CommentItem = {
@@ -86,7 +87,8 @@ export const prototypeAssets: Record<PrototypeAssetKey, string> = {
   radioEmptyIcon: "/assets/figma/icon-radio-empty.svg",
   engineerAvatar: "/assets/figma/avatar-engineer.png",
   floatingChatReference: "/assets/figma/floating-chat-reference.png",
-  storyDetailExtraFrame01: "/assets/figma/story-detail-extra-frame-01.png",
+  storyDetailExtraFrame01: "/assets/figma/2_Playbook_04_1.jpg",
+  storyDetailExtraFrame01Scroll: "/assets/figma/2_Playbook_04_2.jpg",
   storyDetailExtraFrame02: "/assets/figma/story-detail-extra-frame-02.png",
 };
 

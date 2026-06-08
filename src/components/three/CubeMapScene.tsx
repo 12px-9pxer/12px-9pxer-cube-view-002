@@ -82,6 +82,8 @@ type CubeMesh = THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial> & {
   userData: CubeMeshUserData;
 };
 
+type StoryThumbnailCubeMode = "preview" | "orbit";
+
 type GridPlane = THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial> & {
   userData: {
     visibilityNormal?: THREE.Vector3;
@@ -1135,6 +1137,8 @@ export default function CubeMapScene({
     let emissiveMaskTexture: THREE.Texture | null = null;
     let storyThumbnailTextures: THREE.Texture[] = [];
     let storyThumbnailCube: THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial[]> | null = null;
+    let storyThumbnailCubeParent: CubeMesh | null = null;
+    let storyThumbnailCubeMode: StoryThumbnailCubeMode | null = null;
     let cubeAssetsReady = false;
     let animationFrame = 0;
     let disposed = false;
@@ -1874,6 +1878,8 @@ export default function CubeMapScene({
     };
 
     const applySearchHighlightTarget = () => {
+      disposeStoryThumbnailCube("preview");
+
       if (!selectedMesh) {
         setDefaultCubeTargets();
         return;
@@ -1896,17 +1902,26 @@ export default function CubeMapScene({
 
     const applyChatSortHighlightTargets = () => {
       if (!isChatSortActive()) {
+        disposeStoryThumbnailCube("preview");
         setDefaultCubeTargets();
         return;
       }
 
       const candidateSet = new Set(chatSortCandidateMeshes);
       const isFinalStage = isChatSortFinalStage();
+      const shouldShowOrbitPreview = isFinalStage && chatSortFinalMesh !== null;
       setOutlineSources(chatSortCandidateMeshes);
+
+      if (shouldShowOrbitPreview) {
+        createStoryThumbnailCube(chatSortFinalMesh, "preview");
+      } else {
+        disposeStoryThumbnailCube("preview");
+      }
 
       cubeMeshes.forEach((mesh) => {
         const isCandidate = candidateSet.has(mesh);
         const isHoveredCandidate = hovered === mesh && isCandidate;
+        const isOrbitPreviewMesh = shouldShowOrbitPreview && mesh === chatSortFinalMesh;
         mesh.userData.targetPosition.copy(mesh.userData.basePosition);
         mesh.userData.targetScale =
           isCandidate && (!isFinalStage || isHoveredCandidate)
@@ -1915,9 +1930,19 @@ export default function CubeMapScene({
         mesh.userData.targetOpacity = isCandidate
           ? cubeSceneTheme.hover.highlightOpacity
           : SEARCH_DIMMED_OPACITY;
-        mesh.userData.targetOpacityMapMix = 0;
+        mesh.userData.targetOpacityMapMix = isOrbitPreviewMesh ? 1 : 0;
+
+        if (isOrbitPreviewMesh) {
+          setOrbitViewMaterialTargets(mesh);
+          mesh.userData.targetFrontViewFadeStrength =
+            cubeSceneTheme.orbitView.frontViewFade.strength;
+          return;
+        }
+
         setMapViewMaterialTargets(mesh);
-        mesh.userData.targetEmissiveStrength = isCandidate ? shaderTheme.emissiveStrength : cubeSceneTheme.mapView.emissiveStrength;
+        mesh.userData.targetEmissiveStrength = isCandidate
+          ? shaderTheme.emissiveStrength
+          : cubeSceneTheme.mapView.emissiveStrength;
         mesh.userData.targetFrontViewFadeStrength = 0;
       });
     };
@@ -1945,8 +1970,8 @@ export default function CubeMapScene({
       });
     };
 
-    const disposeStoryThumbnailCube = () => {
-      if (!storyThumbnailCube) {
+    const disposeStoryThumbnailCube = (mode?: StoryThumbnailCubeMode) => {
+      if (!storyThumbnailCube || (mode && storyThumbnailCubeMode !== mode)) {
         return;
       }
 
@@ -1954,11 +1979,24 @@ export default function CubeMapScene({
       storyThumbnailCube.geometry.dispose();
       storyThumbnailCube.material.forEach((material) => material.dispose());
       storyThumbnailCube = null;
+      storyThumbnailCubeParent = null;
+      storyThumbnailCubeMode = null;
       delete container.dataset.storyThumbnailFaces;
+      delete container.dataset.storyThumbnailMode;
+      delete container.dataset.storyThumbnailParentKey;
     };
 
-    const createStoryThumbnailCube = () => {
-      if (!focusedMesh || storyThumbnailTextures.length === 0) {
+    const createStoryThumbnailCube = (
+      parentMesh: CubeMesh | null,
+      mode: StoryThumbnailCubeMode,
+    ) => {
+      if (!parentMesh || storyThumbnailTextures.length === 0) {
+        return;
+      }
+
+      if (storyThumbnailCube && storyThumbnailCubeParent === parentMesh) {
+        storyThumbnailCubeMode = mode;
+        container.dataset.storyThumbnailMode = mode;
         return;
       }
 
@@ -1986,10 +2024,14 @@ export default function CubeMapScene({
       storyThumbnailCube.rotation.set(0, 0, 0);
       storyThumbnailCube.scale.setScalar(cubeSceneTheme.orbitView.storyCube.scale);
       storyThumbnailCube.userData.isStoryThumbnailCube = true;
-      focusedMesh.add(storyThumbnailCube);
+      storyThumbnailCubeParent = parentMesh;
+      storyThumbnailCubeMode = mode;
+      parentMesh.add(storyThumbnailCube);
       container.dataset.storyThumbnailFaces = faceTextures
         .map((texture) => texture.source?.data?.currentSrc || texture.source?.data?.src || "story-thumbnail")
         .join(",");
+      container.dataset.storyThumbnailMode = mode;
+      container.dataset.storyThumbnailParentKey = parentMesh.userData.key;
     };
 
     const enterOrbitView = () => {
@@ -2016,7 +2058,7 @@ export default function CubeMapScene({
       applyOrbitControls();
       startOrbitAutoRotate();
       applyOrbitViewTargets();
-      createStoryThumbnailCube();
+      createStoryThumbnailCube(focusedMesh, "orbit");
       notifyOrbitViewChange();
     };
 
@@ -2071,6 +2113,7 @@ export default function CubeMapScene({
       delete container.dataset.searchHighlightKey;
       container.style.cursor = "default";
       setOutlineSource(null);
+      disposeStoryThumbnailCube("preview");
       setDefaultCubeTargets();
     };
 
@@ -2092,6 +2135,7 @@ export default function CubeMapScene({
       syncChatSortDataset();
       setOutlineSource(null);
       resetSearchHighlightZoom();
+      disposeStoryThumbnailCube("preview");
 
       if (viewMode === "map") {
         container.style.cursor = "default";
