@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import { prototypeParams } from "../../config/prototypeParams";
+import { getGuiScaleForViewport } from "../../utils/guiScale";
 
 type StageViewportMetrics = {
   width: number;
@@ -21,6 +22,7 @@ type StageViewportMetrics = {
   safeRight: number;
   safeBottom: number;
   safeLeft: number;
+  guiScale: number;
 };
 
 type StageStyle = CSSProperties &
@@ -32,7 +34,8 @@ type StageStyle = CSSProperties &
     | "--safe-top"
     | "--safe-right"
     | "--safe-bottom"
-    | "--safe-left",
+    | "--safe-left"
+    | "--gui-scale",
     string
   >;
 
@@ -47,6 +50,7 @@ function getStageViewportMetrics(): StageViewportMetrics {
       safeRight: 1904,
       safeBottom: 1064,
       safeLeft: 16,
+      guiScale: getGuiScaleForViewport(1920, 1080),
     };
   }
 
@@ -63,6 +67,7 @@ function getStageViewportMetrics(): StageViewportMetrics {
     safeRight: width - safeMargin,
     safeBottom: height - safeMargin,
     safeLeft: safeMargin,
+    guiScale: getGuiScaleForViewport(width, height),
   };
 }
 
@@ -226,6 +231,7 @@ export function PrototypeStage({
     "--safe-right": `${viewportMetrics.safeRight}px`,
     "--safe-bottom": `${viewportMetrics.safeBottom}px`,
     "--safe-left": `${viewportMetrics.safeLeft}px`,
+    "--gui-scale": `${viewportMetrics.guiScale}`,
   } as StageStyle;
 
   return (
@@ -245,7 +251,7 @@ export function PrototypeStage({
           ))}
         </div>
 
-        <StageScaleContext.Provider value={1}>
+        <StageScaleContext.Provider value={viewportMetrics.guiScale}>
           <div className="prototype-canvas text-crisp">{children}</div>
         </StageScaleContext.Provider>
       </section>

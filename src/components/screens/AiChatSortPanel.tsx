@@ -387,7 +387,10 @@ export function AiChatSortPanel({
   const hasQuickPrompts = aiChatSortConfig.quickPrompts.length > 0;
 
   return (
-    <div className="ai-chat-sort-shell pointer-events-auto" data-name="ai_search">
+    <div
+      className="gui-scale gui-origin-bottom-right ai-chat-sort-shell pointer-events-auto"
+      data-name="ai_search"
+    >
       <div
         ref={panelRef}
         className="ai-chat-sort-panel flex w-full flex-col justify-end gap-[41px] py-[10px]"

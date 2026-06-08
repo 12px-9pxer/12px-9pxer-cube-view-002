@@ -1,4 +1,5 @@
 import type { CommentItem } from "../data/prototypeContent";
+import { getCurrentGuiScale } from "./guiScale";
 
 export type CommentPosition = CommentItem["position"];
 export type CommentVelocity = {
@@ -36,8 +37,16 @@ function getViewportBounds() {
 
 function getCommentCardWidth() {
   const viewport = getViewportBounds();
+  const guiScale = getCurrentGuiScale();
 
-  return Math.min(COMMENT_CARD_WIDTH, Math.max(240, viewport.width - SAFE_MARGIN * 2));
+  return (
+    Math.min(COMMENT_CARD_WIDTH, Math.max(240, viewport.width - SAFE_MARGIN * 2)) *
+    guiScale
+  );
+}
+
+function getCommentCardHeight() {
+  return COMMENT_CARD_HEIGHT * getCurrentGuiScale();
 }
 
 const COMMENT_SLOTS: CommentPosition[] = [
@@ -55,33 +64,38 @@ const COMMENT_SLOTS: CommentPosition[] = [
 export function getInitialCommentStackPositions(count: number) {
   const viewport = getViewportBounds();
   const isMobile = viewport.width <= MOBILE_COMMENT_LAYOUT_BREAKPOINT;
+  const guiScale = getCurrentGuiScale();
+  const commentCardHeight = getCommentCardHeight();
+  const inputHeight = COMMENT_INPUT_HEIGHT * guiScale;
+  const stackGap = INITIAL_COMMENT_STACK_GAP * guiScale;
   const safeBottom = viewport.height - STAGE_SAFE_MARGIN;
   const inputLeft = isMobile ? STAGE_SAFE_MARGIN : STAGE_SAFE_MARGIN + COMMENT_INPUT_DESKTOP_LEFT_OFFSET;
   const inputTop =
     safeBottom -
-    COMMENT_INPUT_HEIGHT -
+    inputHeight -
     (isMobile ? COMMENT_INPUT_MOBILE_BOTTOM_GAP : COMMENT_INPUT_DESKTOP_BOTTOM_GAP);
   const stackAnchorTop = isMobile
-    ? safeBottom - COMMENT_INPUT_HEIGHT - REACTION_BAR_MOBILE_BOTTOM_GAP
+    ? safeBottom - inputHeight - REACTION_BAR_MOBILE_BOTTOM_GAP
     : inputTop;
 
   return Array.from({ length: count }, (_, index) => ({
     x: inputLeft,
     y:
       stackAnchorTop -
-      INITIAL_COMMENT_STACK_GAP -
-      COMMENT_CARD_HEIGHT -
-      (count - index - 1) * (COMMENT_CARD_HEIGHT + INITIAL_COMMENT_STACK_GAP),
+      stackGap -
+      commentCardHeight -
+      (count - index - 1) * (commentCardHeight + stackGap),
   }));
 }
 
 export function clampCommentPosition(position: CommentPosition): CommentPosition {
   const viewport = getViewportBounds();
   const commentCardWidth = getCommentCardWidth();
+  const commentCardHeight = getCommentCardHeight();
   const maxX = Math.max(SAFE_MARGIN, viewport.width - commentCardWidth - SAFE_MARGIN);
   const maxY = Math.max(
     TOP_SAFE_MARGIN,
-    viewport.height - COMMENT_CARD_HEIGHT - SAFE_MARGIN,
+    viewport.height - commentCardHeight - SAFE_MARGIN,
   );
 
   return {
@@ -92,12 +106,13 @@ export function clampCommentPosition(position: CommentPosition): CommentPosition
 
 function overlaps(a: CommentPosition, b: CommentPosition) {
   const commentCardWidth = getCommentCardWidth();
+  const commentCardHeight = getCommentCardHeight();
 
   return !(
     a.x + commentCardWidth + COLLISION_GAP < b.x ||
     b.x + commentCardWidth + COLLISION_GAP < a.x ||
-    a.y + COMMENT_CARD_HEIGHT + COLLISION_GAP < b.y ||
-    b.y + COMMENT_CARD_HEIGHT + COLLISION_GAP < a.y
+    a.y + commentCardHeight + COLLISION_GAP < b.y ||
+    b.y + commentCardHeight + COLLISION_GAP < a.y
   );
 }
 
@@ -146,18 +161,20 @@ export function resolveCommentCollisions(
           continue;
         }
 
+        const commentCardWidth = getCommentCardWidth();
+        const commentCardHeight = getCommentCardHeight();
         const centerA = {
-          x: a.position.x + COMMENT_CARD_WIDTH / 2,
-          y: a.position.y + COMMENT_CARD_HEIGHT / 2,
+          x: a.position.x + commentCardWidth / 2,
+          y: a.position.y + commentCardHeight / 2,
         };
         const centerB = {
-          x: b.position.x + COMMENT_CARD_WIDTH / 2,
-          y: b.position.y + COMMENT_CARD_HEIGHT / 2,
+          x: b.position.x + commentCardWidth / 2,
+          y: b.position.y + commentCardHeight / 2,
         };
         const overlapX =
-          COMMENT_CARD_WIDTH + COLLISION_GAP - Math.abs(centerA.x - centerB.x);
+          commentCardWidth + COLLISION_GAP - Math.abs(centerA.x - centerB.x);
         const overlapY =
-          COMMENT_CARD_HEIGHT + COLLISION_GAP - Math.abs(centerA.y - centerB.y);
+          commentCardHeight + COLLISION_GAP - Math.abs(centerA.y - centerB.y);
         const directionX = centerA.x <= centerB.x ? -1 : 1;
         const directionY = centerA.y <= centerB.y ? -1 : 1;
 

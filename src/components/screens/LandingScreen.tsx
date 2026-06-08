@@ -48,7 +48,7 @@ export function LandingScreen({ onGoToSearch }: LandingScreenProps) {
       data-name="01 Screen - Landing Intro (시작 화면)"
     >
       <UserStoryLogo
-        className="absolute left-[calc(var(--viewport-center-x)-210px)] top-[calc(var(--viewport-center-y)-110px)]"
+        className="gui-scale gui-origin-center absolute left-[calc(var(--viewport-center-x)-210px)] top-[calc(var(--viewport-center-y)-110px)]"
         nodeId="15:160"
         width={420}
         height={118}
@@ -57,7 +57,7 @@ export function LandingScreen({ onGoToSearch }: LandingScreenProps) {
       <AnimatedButton
         type="button"
         onClick={showCodePrompt}
-        className="absolute left-[calc(var(--viewport-center-x)-63.27px)] top-[calc(var(--viewport-center-y)+41px)] flex h-[54px] w-[126.54px] items-center justify-center gap-[4px] rounded-full bg-[#2c2c2d] px-[23.77px] py-[7.31px] text-[25.6px] leading-[1.5] tracking-[-0.256px] text-white backdrop-blur-[18.29px]"
+        className="gui-scale gui-origin-center absolute left-[calc(var(--viewport-center-x)-63.27px)] top-[calc(var(--viewport-center-y)+41px)] flex h-[54px] w-[126.54px] items-center justify-center gap-[4px] rounded-full bg-[#2c2c2d] px-[23.77px] py-[7.31px] text-[25.6px] leading-[1.5] tracking-[-0.256px] text-white backdrop-blur-[18.29px]"
         data-node-id="15:128"
         data-name="action/go-to-cube-view-button"
       >
@@ -68,7 +68,7 @@ export function LandingScreen({ onGoToSearch }: LandingScreenProps) {
       {isCodePromptVisible ? (
         <form
           onSubmit={submitAccessCode}
-          className="absolute left-[var(--viewport-center-x)] top-[calc(var(--viewport-center-y)+112px)] flex w-[320px] max-w-[calc(var(--viewport-width)-32px)] -translate-x-1/2 flex-col items-center gap-[8px]"
+          className="gui-scale gui-origin-top-center absolute left-[var(--viewport-center-x)] top-[calc(var(--viewport-center-y)+112px)] flex w-[320px] max-w-[calc(var(--viewport-width)-32px)] -translate-x-1/2 flex-col items-center gap-[8px]"
           data-name="landing/access-code-panel"
         >
           <div className="flex h-[58px] w-full items-center gap-[8px] rounded-full border border-white/30 bg-white/25 p-[6px] shadow-[0_18px_48px_rgba(0,0,0,0.12)] backdrop-blur-[35px]">
@@ -131,7 +131,7 @@ export function LandingScreen({ onGoToSearch }: LandingScreenProps) {
       ) : null}
 
       <div
-        className="absolute bottom-[56px] left-[var(--viewport-center-x)] flex h-[16px] -translate-x-1/2 items-center"
+        className="gui-scale gui-origin-bottom-center absolute bottom-[56px] left-[var(--viewport-center-x)] flex h-[16px] -translate-x-1/2 items-center"
         data-node-id="1897:863"
         data-name="brand/landing-bottom-hyundai-kia-logos"
         aria-label="Hyundai Kia"

@@ -1,5 +1,101 @@
-@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css");
 @import "tailwindcss";
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 100;
+  font-display: swap;
+  src: url("/assets/fonts/pretendard/Pretendard-Thin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 200;
+  font-display: swap;
+  src: url("/assets/fonts/pretendard/Pretendard-ExtraLight.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("/assets/fonts/pretendard/Pretendard-Light.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/assets/fonts/pretendard/Pretendard-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/assets/fonts/pretendard/Pretendard-Medium.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/assets/fonts/pretendard/Pretendard-SemiBold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/assets/fonts/pretendard/Pretendard-Bold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/assets/fonts/pretendard/Pretendard-ExtraBold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("/assets/fonts/pretendard/Pretendard-Black.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Material Symbols Outlined";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("/assets/fonts/material-symbols/MaterialSymbolsOutlined-subset.woff2") format("woff2");
+}
+
+.material-symbols-outlined {
+  display: inline-block;
+  font-family: "Material Symbols Outlined";
+  font-size: 24px;
+  font-style: normal;
+  font-weight: normal;
+  letter-spacing: normal;
+  line-height: 1;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: "liga";
+  font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+}
 
 :root {
   --color-bg-warm: #f9f9f7;
@@ -63,6 +159,46 @@ input {
 
 button {
   cursor: pointer;
+}
+
+.gui-scale {
+  scale: calc(var(--gui-scale) * var(--gui-motion-scale, 1));
+}
+
+.animated-button {
+  scale: var(--gui-motion-scale, 1);
+}
+
+.gui-scale.animated-button {
+  scale: calc(var(--gui-scale) * var(--gui-motion-scale, 1));
+}
+
+.gui-origin-center {
+  transform-origin: center center;
+}
+
+.gui-origin-top-left {
+  transform-origin: top left;
+}
+
+.gui-origin-top-center {
+  transform-origin: top center;
+}
+
+.gui-origin-top-right {
+  transform-origin: top right;
+}
+
+.gui-origin-bottom-left {
+  transform-origin: bottom left;
+}
+
+.gui-origin-bottom-center {
+  transform-origin: bottom center;
+}
+
+.gui-origin-bottom-right {
+  transform-origin: bottom right;
 }
 
 .prototype-root {
@@ -360,7 +496,8 @@ button {
   width: 100%;
   height: 100%;
   background: #000;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center center;
   pointer-events: none;
 }
 
@@ -388,6 +525,8 @@ button {
   left: calc(var(--viewport-center-x) - 346.5px);
   width: 693px;
   height: 286px;
+  scale: calc(var(--gui-scale) * var(--gui-motion-scale, 1));
+  transform-origin: center center;
   pointer-events: auto;
 }
 
@@ -444,6 +583,8 @@ button {
   display: block;
   width: 264px;
   height: 150px;
+  scale: calc(var(--gui-scale) * var(--gui-motion-scale, 1));
+  transform-origin: top left;
   object-fit: contain;
   pointer-events: none;
   user-select: none;
@@ -488,7 +629,7 @@ button {
     top: calc(var(--safe-top) + 112px);
     left: 16px;
     transform-origin: top left;
-    scale: 0.86;
+    scale: calc(0.86 * var(--gui-motion-scale, 1));
   }
 
 }

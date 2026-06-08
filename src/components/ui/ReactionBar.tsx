@@ -149,7 +149,7 @@ export function ReactionBar({ onSendReaction }: ReactionBarProps) {
   return (
     <div
       ref={barRef}
-      className="page3-reaction-bar absolute left-[var(--viewport-center-x)] top-[calc(var(--safe-bottom)-76px-28px)] flex h-[76px] w-[406px] max-w-[calc(var(--viewport-width)-32px)] -translate-x-1/2 gap-[6px] rounded-full border p-[6px]"
+      className="gui-scale gui-origin-bottom-center page3-reaction-bar absolute left-[var(--viewport-center-x)] top-[calc(var(--safe-bottom)-76px-28px)] flex h-[76px] w-[406px] max-w-[calc(var(--viewport-width)-32px)] -translate-x-1/2 gap-[6px] rounded-full border p-[6px]"
       style={reactionBarStyle}
       data-node-id="15:16"
       data-name="reaction/reaction-bar"

@@ -59,15 +59,14 @@ export function PollCard({
 
     const enterTween = gsap.fromTo(
       cardElement,
-      { scale: 0 },
+      { "--gui-motion-scale": 0 },
       {
-        scale: 1,
+        "--gui-motion-scale": 1,
         delay: page3Motion.pollEnterDelay,
         duration: page3Motion.pollEnterDuration,
         ease: page3Motion.pollEnterEase,
         force3D: true,
         overwrite: "auto",
-        transformOrigin: "50% 50%",
       },
     );
 
@@ -167,7 +166,7 @@ export function PollCard({
   return (
     <section
       ref={cardRef}
-      className="page3-poll-card absolute bottom-[calc(var(--viewport-height)-var(--safe-bottom)+28px)] left-[max(var(--safe-left),calc(var(--safe-right)-439px))] flex max-h-[calc(var(--safe-bottom)-var(--safe-top)-148px)] w-[439px] max-w-[calc(var(--viewport-width)-32px)] flex-col gap-[14px] overflow-x-hidden overflow-y-auto rounded-[24px] border px-[20px] py-[20px] text-white"
+      className="gui-scale gui-origin-bottom-right page3-poll-card absolute bottom-[calc(var(--viewport-height)-var(--safe-bottom)+28px)] left-[max(var(--safe-left),calc(var(--safe-right)-439px))] flex max-h-[calc(var(--safe-bottom)-var(--safe-top)-148px)] w-[439px] max-w-[calc(var(--viewport-width)-32px)] flex-col gap-[14px] overflow-x-hidden overflow-y-auto rounded-[24px] border px-[20px] py-[20px] text-white"
       style={pollCardStyle}
       data-node-id="15:34"
       data-name="poll/poll-card - child-in-car"

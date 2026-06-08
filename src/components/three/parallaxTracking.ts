@@ -1,5 +1,7 @@
 import type { BlazeFaceModel, NormalizedFace } from "@tensorflow-models/blazeface";
 
+const BLAZEFACE_MODEL_URL = "/assets/models/blazeface/model.json";
+
 export type ParallaxViewInput = {
   x: number;
   y: number;
@@ -371,20 +373,29 @@ async function createFaceParallaxTracker({
       throw new Error("Face parallax tracker stopped before model startup.");
     }
 
-    const [tf, blazeface] = await Promise.all([
+    const [tf, blazeface, tfConverter] = await Promise.all([
       import("@tensorflow/tfjs-core"),
-      import("@tensorflow-models/blazeface"),
+      import("@tensorflow-models/blazeface/dist/face"),
       import("@tensorflow/tfjs-converter"),
       import("@tensorflow/tfjs-backend-webgl"),
-    ]).then(([tfModule, blazefaceModule]) => [tfModule, blazefaceModule] as const);
+    ]).then(([tfModule, blazefaceModule, tfConverterModule]) => [
+      tfModule,
+      blazefaceModule,
+      tfConverterModule,
+    ] as const);
 
     await tf.setBackend("webgl");
     await tf.ready();
 
-    model = await blazeface.load({
-      maxFaces: 1,
-      scoreThreshold: config.tracking.scoreThreshold,
-    });
+    const graphModel = await tfConverter.loadGraphModel(BLAZEFACE_MODEL_URL);
+    model = new blazeface.BlazeFaceModel(
+      graphModel,
+      128,
+      128,
+      1,
+      0.3,
+      config.tracking.scoreThreshold,
+    );
 
     if (stopped || signal?.aborted) {
       throw new Error("Face parallax tracker stopped after model startup.");

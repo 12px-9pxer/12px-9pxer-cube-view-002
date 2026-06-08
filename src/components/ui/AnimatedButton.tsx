@@ -1,6 +1,7 @@
 import { gsap } from "gsap";
 import {
   type ButtonHTMLAttributes,
+  type CSSProperties,
   type PointerEvent,
   useCallback,
   useRef,
@@ -10,6 +11,9 @@ type AnimatedButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   hoverScale?: number;
   pressScale?: number;
 };
+
+type AnimatedButtonStyle = CSSProperties &
+  Record<"--gui-motion-scale", number>;
 
 export function AnimatedButton({
   children,
@@ -23,6 +27,7 @@ export function AnimatedButton({
   onPointerDown,
   onPointerUp,
   onPointerCancel,
+  style,
   ...buttonProps
 }: AnimatedButtonProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -33,11 +38,10 @@ export function AnimatedButton({
     }
 
     gsap.to(buttonRef.current, {
-      scale,
+      "--gui-motion-scale": scale,
       duration,
       ease: scale === 1 ? "elastic.out(1, 0.45)" : "power2.out",
       overwrite: "auto",
-      transformOrigin: "50% 50%",
     });
   }, []);
 
@@ -81,7 +85,8 @@ export function AnimatedButton({
       ref={buttonRef}
       type={type}
       disabled={disabled}
-      className={className}
+      className={`animated-button ${className}`}
+      style={{ "--gui-motion-scale": 1, ...style } as AnimatedButtonStyle}
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
       onPointerDown={handlePointerDown}

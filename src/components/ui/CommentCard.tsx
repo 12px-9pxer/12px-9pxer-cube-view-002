@@ -35,7 +35,7 @@ export function CommentCard({
 
   return (
     <article
-      className={`comment-card-glass relative flex h-[119.57px] w-[472px] max-w-[calc(var(--viewport-width)-36px)] select-none gap-[21.94px] overflow-hidden rounded-[24px] border-2 p-[18.29px] text-white ${className}`}
+      className={`gui-scale gui-origin-top-left comment-card-glass relative flex h-[119.57px] w-[472px] max-w-[calc(var(--viewport-width)-36px)] select-none gap-[21.94px] overflow-hidden rounded-[24px] border-2 p-[18.29px] text-white ${className}`}
       style={glassStyle}
       data-node-id={nodeId}
       data-name={dataName}

@@ -105,7 +105,7 @@ export function SearchScreen({ onOpenStoryDetail, isActive = true }: SearchScree
       {isOrbitView ? (
         <>
           <header
-            className="pointer-events-none absolute left-[var(--viewport-center-x)] top-[max(calc(var(--safe-top)+96px),calc(var(--viewport-center-y)-720px))] z-20 flex h-[102px] w-[242px] -translate-x-1/2 flex-col items-center text-white"
+            className="gui-scale gui-origin-top-center pointer-events-none absolute left-[var(--viewport-center-x)] top-[max(calc(var(--safe-top)+96px),calc(var(--viewport-center-y)-720px))] z-20 flex h-[102px] w-[242px] -translate-x-1/2 flex-col items-center text-white"
             data-name="header/orbit-story-summary"
             aria-label={prototypeText.orbitTitle}
           >
@@ -143,7 +143,7 @@ export function SearchScreen({ onOpenStoryDetail, isActive = true }: SearchScree
           <AnimatedButton
             type="button"
             onClick={handleBackToCubeMap}
-            className="absolute left-[calc(var(--safe-left)+32px)] top-[calc(var(--safe-top)+32px)] z-20 flex h-[54px] items-center justify-center gap-[8px] rounded-full bg-[#2c2c2d] px-[22px] text-[20px] font-medium leading-[1.5] text-white backdrop-blur-[18.29px]"
+            className="gui-scale gui-origin-top-left absolute left-[calc(var(--safe-left)+32px)] top-[calc(var(--safe-top)+32px)] z-20 flex h-[54px] items-center justify-center gap-[8px] rounded-full bg-[#2c2c2d] px-[22px] text-[20px] font-medium leading-[1.5] text-white backdrop-blur-[18.29px]"
             data-name="button/back-to-cube-map"
             aria-label="Back to cube map"
             title="Back to cube map"
@@ -155,7 +155,7 @@ export function SearchScreen({ onOpenStoryDetail, isActive = true }: SearchScree
           <AnimatedButton
             type="button"
             onClick={() => setIsParallaxViewEnabled((isEnabled) => !isEnabled)}
-            className="absolute left-[calc(var(--safe-right)-86px)] top-[calc(var(--safe-top)+32px)] z-20 flex h-[54px] w-[54px] items-center justify-center rounded-full bg-[#2c2c2d] text-white backdrop-blur-[18.29px]"
+            className="gui-scale gui-origin-top-right absolute left-[calc(var(--safe-right)-86px)] top-[calc(var(--safe-top)+32px)] z-20 flex h-[54px] w-[54px] items-center justify-center rounded-full bg-[#2c2c2d] text-white backdrop-blur-[18.29px]"
             data-name="button/orbit-parallax-toggle"
             aria-label={isParallaxViewEnabled ? "Disable HeadTrack" : "Enable HeadTrack"}
             aria-pressed={isParallaxViewEnabled}
@@ -172,7 +172,7 @@ export function SearchScreen({ onOpenStoryDetail, isActive = true }: SearchScree
           <AnimatedButton
             type="button"
             onClick={onOpenStoryDetail}
-            className="absolute left-[var(--viewport-center-x)] top-[calc(var(--viewport-center-y)+360px)] z-20 flex h-[64px] w-[64px] -translate-x-1/2 items-center justify-center rounded-full bg-[#2c2c2d] text-white shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-[18px]"
+            className="gui-scale gui-origin-center absolute left-[var(--viewport-center-x)] top-[calc(var(--viewport-center-y)+360px)] z-20 flex h-[64px] w-[64px] -translate-x-1/2 items-center justify-center rounded-full bg-[#2c2c2d] text-white shadow-[0_18px_44px_rgba(0,0,0,0.18)] backdrop-blur-[18px]"
             data-name="button/orbit-open-story-detail"
             aria-label="Open story detail"
             title="Open story detail"
@@ -183,7 +183,7 @@ export function SearchScreen({ onOpenStoryDetail, isActive = true }: SearchScree
       ) : (
         <>
           <nav
-            className="cube-top-bar-scroll absolute left-[var(--viewport-center-x)] top-[calc(var(--safe-top)+44px)] z-10 w-max max-w-[calc(var(--viewport-width)-32px)] -translate-x-1/2 overflow-x-auto rounded-full p-[6px] backdrop-blur-[35px] [scrollbar-width:none]"
+            className="gui-scale gui-origin-top-center cube-top-bar-scroll absolute left-[var(--viewport-center-x)] top-[calc(var(--safe-top)+44px)] z-10 w-max max-w-[calc(var(--viewport-width)-32px)] -translate-x-1/2 overflow-x-auto rounded-full p-[6px] backdrop-blur-[35px] [scrollbar-width:none]"
             data-node-id="1929:1058"
             data-name="nav/cube-view-top-bar"
             aria-label="Cube View top menu"

@@ -166,11 +166,11 @@ function StoryMomHud({ state }: StoryMomHudProps) {
 
     const tween = gsap.fromTo(
       hud,
-      { autoAlpha: 0, y: -8, scale: 0.985 },
+      { autoAlpha: 0, y: -8, "--gui-motion-scale": 0.985 },
       {
         autoAlpha: 1,
         y: 0,
-        scale: 1,
+        "--gui-motion-scale": 1,
         duration: 0.34,
         ease: "power3.out",
         overwrite: "auto",
@@ -651,7 +651,7 @@ export function DetailScreen({
           <AnimatedButton
             type="button"
             onClick={onBackToSearch}
-            className="absolute left-[calc(var(--safe-left)+28px)] top-[calc(var(--safe-top)+30px)] h-[64px] w-[74px]"
+            className="gui-scale gui-origin-top-left absolute left-[calc(var(--safe-left)+28px)] top-[calc(var(--safe-top)+30px)] h-[64px] w-[74px]"
             data-node-id="15:8"
             data-name="nav/back-button"
             aria-label="검색 화면으로 돌아가기"
@@ -661,7 +661,7 @@ export function DetailScreen({
           </AnimatedButton>
 
           <header
-            className="absolute left-[var(--viewport-center-x)] top-[calc(var(--safe-top)+30px)] flex h-[100px] w-[420px] -translate-x-1/2 flex-col items-center text-center text-white"
+            className="gui-scale gui-origin-top-center absolute left-[var(--viewport-center-x)] top-[calc(var(--safe-top)+30px)] flex h-[100px] w-[420px] -translate-x-1/2 flex-col items-center text-center text-white"
             data-node-id="15:13"
             data-name="header/story-title-and-stats"
           >
@@ -685,7 +685,7 @@ export function DetailScreen({
           </header>
 
           <div
-            className="absolute left-[calc(var(--safe-right)-156px)] top-[calc(var(--safe-top)+30px)] flex h-[64px] w-[156px] items-center justify-end gap-[8px]"
+            className="gui-scale gui-origin-top-right absolute left-[calc(var(--safe-right)-156px)] top-[calc(var(--safe-top)+30px)] flex h-[64px] w-[156px] items-center justify-end gap-[8px]"
             data-node-id="15:27"
             data-name="nav/story-action-buttons"
           >
@@ -761,7 +761,7 @@ export function DetailScreen({
                   event.preventDefault();
                   submitComment();
                 }}
-                className="page3-comment-input absolute left-[calc(var(--safe-left)+27px)] top-[calc(var(--safe-bottom)-76px-28px)] flex h-[76px] w-[440px] max-w-[calc(var(--viewport-width)-32px)] items-center overflow-hidden rounded-full border"
+                className="gui-scale gui-origin-bottom-left page3-comment-input absolute left-[calc(var(--safe-left)+27px)] top-[calc(var(--safe-bottom)-76px-28px)] flex h-[76px] w-[440px] max-w-[calc(var(--viewport-width)-32px)] items-center overflow-hidden rounded-full border"
                 style={commentInputStyle}
                 data-node-id="15:77"
                 data-name="comment/comment-input"
